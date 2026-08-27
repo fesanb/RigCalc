@@ -1,7 +1,7 @@
 import unittest
 
-from loadcalc.model import DocumentModel, Point3D, Support, TrussSegment
-from loadcalc.topology import build_constructions
+from rigcalc.model import DocumentModel, Point3D, Support, TrussSegment
+from rigcalc.topology import build_constructions
 
 
 class AttachmentTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-from loadcalc.model.geometry import BoundingBox, Point3D
+from rigcalc.model.geometry import BoundingBox, Point3D
 
 
 def symbol_location(vs, handle):

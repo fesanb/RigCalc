@@ -7,7 +7,7 @@ def _item_name(item):
 
 
 def make_text_report(document, constructions):
-    lines = ["LOADCALC GEOMETRY MODEL", "=" * 72,
+    lines = ["RIGCALC GEOMETRY MODEL", "=" * 72,
              "Constructions: {}".format(len(constructions)),
              "Truss objects: {}".format(len(document.trusses)),
              "Hoists: {}".format(len(document.supports)),

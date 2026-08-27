@@ -1,7 +1,7 @@
 import unittest
 
-from loadcalc.model import Point3D
-from loadcalc.topology.geometry import point_to_segment
+from rigcalc.model import Point3D
+from rigcalc.topology.geometry import point_to_segment
 
 
 class GeometryTests(unittest.TestCase):

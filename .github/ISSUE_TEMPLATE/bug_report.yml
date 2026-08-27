@@ -1,0 +1,39 @@
+name: Bug report
+description: Report reproducible incorrect behavior in RigCalc.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve RigCalc. Do not include confidential project data.
+  - type: input
+    id: version
+    attributes:
+      label: RigCalc version or commit
+      placeholder: v0.1.0 or commit hash
+    validations:
+      required: true
+  - type: input
+    id: vectorworks
+    attributes:
+      label: Vectorworks version
+      placeholder: Vectorworks 2026 Update 1
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: Provide the smallest reproducible example you can.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or error log
+      render: text

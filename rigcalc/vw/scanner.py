@@ -1,6 +1,6 @@
 import math
 
-from loadcalc.model import DocumentModel, Point3D, PointLoad, Support, TrussSegment
+from rigcalc.model import DocumentModel, Point3D, PointLoad, Support, TrussSegment
 
 from .geometry import bounding_box, center_z, symbol_location, z_rotation
 from .records import get_parametric_info, safe_float

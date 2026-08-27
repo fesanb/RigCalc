@@ -1,4 +1,4 @@
-from loadcalc.model.construction import StationRange
+from rigcalc.model.construction import StationRange
 
 
 def build_adjacency(trusses, connections):

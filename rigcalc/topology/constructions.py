@@ -1,4 +1,4 @@
-from loadcalc.model.construction import Construction
+from rigcalc.model.construction import Construction
 
 from .attachments import attach_document_objects
 from .connections import detect_connections

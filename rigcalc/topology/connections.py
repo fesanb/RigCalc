@@ -1,5 +1,5 @@
-from loadcalc import config
-from loadcalc.model.construction import Connection
+from rigcalc import config
+from rigcalc.model.construction import Connection
 
 from .geometry import bbox_distance, distance_2d, parallel_angle_difference, point_to_segment
 

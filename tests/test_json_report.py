@@ -3,8 +3,8 @@ import os
 import tempfile
 import unittest
 
-from loadcalc.model import DocumentModel, Point3D, Support
-from loadcalc.report.json_report import write_json_report
+from rigcalc.model import DocumentModel, Point3D, Support
+from rigcalc.report.json_report import write_json_report
 
 
 class UncopyableHandle:

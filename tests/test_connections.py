@@ -1,7 +1,7 @@
 import unittest
 
-from loadcalc.model import Point3D, TrussSegment
-from loadcalc.topology.connections import detect_connections
+from rigcalc.model import Point3D, TrussSegment
+from rigcalc.topology.connections import detect_connections
 
 
 def line(identifier, start, end):

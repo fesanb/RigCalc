@@ -1,7 +1,7 @@
 import unittest
 
-from loadcalc.model import DocumentModel, Point3D, TrussSegment
-from loadcalc.topology import build_constructions
+from rigcalc.model import DocumentModel, Point3D, TrussSegment
+from rigcalc.topology import build_constructions
 
 
 def line(identifier, start_x, end_x):

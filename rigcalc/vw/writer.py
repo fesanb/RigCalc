@@ -1,12 +1,12 @@
 import os
 
-from loadcalc import config
-from loadcalc.report import make_text_report, write_json_report
+from rigcalc import config
+from rigcalc.report import make_text_report, write_json_report
 
 
 def report_output_directory():
-    loadcalc_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(loadcalc_root, config.OUTPUT_DIRECTORY_NAME)
+    rigcalc_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    return os.path.join(rigcalc_root, config.OUTPUT_DIRECTORY_NAME)
 
 
 def write_reports(vs, document, constructions):
@@ -25,12 +25,8 @@ def write_reports(vs, document, constructions):
         "attachment_warning_distance_mm": config.ATTACHMENT_WARNING_DISTANCE_MM,
     }
     write_json_report(json_path, document, constructions, settings)
-    try:
-        os.startfile(text_path)
-    except Exception:
-        pass
     vs.AlrtDialog(
-        "LoadCalc geometry analysis complete.\n\n"
+        "RigCalc geometry analysis complete.\n\n"
         "Constructions: {}\nTruss: {}\nHoists: {}\nLoads: {}\n\n"
         "Reports: {}".format(len(constructions), len(document.trusses),
                              len(document.supports), len(document.point_loads), output_dir)

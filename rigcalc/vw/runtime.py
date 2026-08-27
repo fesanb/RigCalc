@@ -1,4 +1,4 @@
-from loadcalc.topology import build_constructions
+from rigcalc.topology import build_constructions
 
 from .scanner import scan_document
 from .writer import write_reports

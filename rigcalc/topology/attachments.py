@@ -1,5 +1,5 @@
-from loadcalc import config
-from loadcalc.model.construction import AttachedObject, Attachment
+from rigcalc import config
+from rigcalc.model.construction import AttachedObject, Attachment
 
 from .geometry import point_to_segment
 
