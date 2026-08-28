@@ -1,7 +1,5 @@
 """Text rendering for solver results; mechanics live in rigcalc.solver."""
 
-from rigcalc.solver import calculate_reactions
-
 
 def _force_row(end, forces):
     return (
@@ -102,6 +100,3 @@ def make_calculation_text(data):
             lines.append("  ISSUE: " + issue)
         lines.append("")
     return "\n".join(lines)
-
-
-__all__ = ["calculate_reactions", "make_calculation_text"]

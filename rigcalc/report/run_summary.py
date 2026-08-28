@@ -131,7 +131,7 @@ def make_run_summary_text(summary):
         "Frigitte motorstøtter: {}\n\n"
         "KONTROLL\n"
         "Lastfeil: {}\n"
-        "DefleksjonsmarkÃ¸rer: {}\n"
+        "Defleksjonsmarkører: {}\n"
         "Interne kraftfeil: {}\n"
         "Tekniske feil: {}\n"
         "Konstruksjoner uten beregning: {}\n"

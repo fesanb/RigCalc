@@ -2,7 +2,7 @@ import unittest
 
 from rigcalc.model import (AttachedObject, Attachment, Construction, DocumentModel,
                            Point3D, PointLoad, Support, TrussSegment)
-from rigcalc.report.calculation_report import calculate_reactions
+from rigcalc.solver import calculate_reactions
 from rigcalc.topology import build_constructions
 
 

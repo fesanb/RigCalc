@@ -1,0 +1,1 @@
+"""RigCalc test suite."""

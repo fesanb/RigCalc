@@ -114,7 +114,6 @@ def classify(record_name, fields):
 
 def load_components(record_name, fields):
     """Extract independent mass components using explicit unit semantics."""
-    components = []
     if record_name == "BrxDistributedWeight":
         item = _distributed_component(fields, ("TotalWeight",), ("DistWeight",), ("Lenght", "Length"))
         return [item] if item else []

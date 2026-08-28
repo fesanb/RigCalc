@@ -4,12 +4,12 @@ import os
 from rigcalc import config
 from rigcalc.normalization import normalize_inventory
 from rigcalc.notifications import evaluate_notifications
-from rigcalc.report import (calculate_reactions, make_calculation_text,
-                            make_text_report, write_json_report,
-                            build_run_summary, make_run_summary_text)
+from rigcalc.report import (build_run_summary, make_calculation_text,
+                            make_run_summary_text, make_text_report,
+                            write_json_report)
 from rigcalc.solver import (calculate_corotational_reactions,
-                            compare_calculations, make_comparison_text,
-                            select_primary_calculation)
+                            calculate_reactions, compare_calculations,
+                            make_comparison_text, select_primary_calculation)
 from .hoist_writeback import write_high_hook_values
 from .notifications import write_notification_markers
 from .truss_cross_writeback import write_truss_cross_forces

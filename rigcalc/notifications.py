@@ -133,7 +133,7 @@ def evaluate_internal_forces(calculation, tolerance_ratio=1.0e-6):
                             "utilization": utilization,
                         }
     notifications = []
-    for key, row in grouped.items():
+    for row in grouped.values():
         if not row["components"]:
             continue
         components = sorted(

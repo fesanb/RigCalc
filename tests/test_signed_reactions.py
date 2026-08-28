@@ -1,7 +1,6 @@
 import unittest
 
-from rigcalc.model import (AttachedObject, Attachment, Construction, Point3D,
-                           PointLoad, Support)
+from rigcalc.model import AttachedObject, Attachment, Construction, Point3D, Support
 from rigcalc.solver.beam_statics import solve_two_support_beam
 
 
