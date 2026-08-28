@@ -14,7 +14,9 @@ requests are welcome.
    python -B -m unittest discover -s tests -v
    ```
 
-5. Keep generated reports out of commits.
+5. If dependency metadata changes, verify the lock file with `uv lock --check`.
+6. Run `git diff --check` and keep generated reports, Vectorworks drawings,
+   credentials, and project-specific data out of commits.
 
 By contributing, you agree that your contribution is licensed under the MIT
 License included in this repository.

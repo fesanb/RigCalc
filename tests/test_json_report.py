@@ -24,6 +24,20 @@ class JsonReportTests(unittest.TestCase):
                 data = json.load(stream)
         self.assertNotIn("source_ref", data["document"]["supports"][0])
 
+    def test_support_geometry_evidence_is_preserved(self):
+        document = DocumentModel(supports=[Support(
+            "H1", "Hoist", Point3D(10, 20, 30),
+            object_position=Point3D(10, 20, 130),
+            geometry_fields={"HoistPos": "Hoist Up", "LoHook": "30"},
+        )])
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "report.json")
+            write_json_report(path, document, [], {})
+            with open(path, encoding="utf-8") as stream:
+                support = json.load(stream)["document"]["supports"][0]
+        self.assertEqual(support["geometry_fields"]["HoistPos"], "Hoist Up")
+        self.assertEqual(support["object_position"]["z"], 130)
+
 
 if __name__ == "__main__":
     unittest.main()

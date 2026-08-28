@@ -22,3 +22,7 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local Vectorworks drawings and automatic backups can contain project data
+# and are too large for the source repository.
+VW_Testfiles/

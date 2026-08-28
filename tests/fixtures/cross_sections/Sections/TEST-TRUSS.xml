@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CrossSectionEntity Ident="TEST-TRUSS" MaterialName="TEST-AL">
+  <SectionName>Test Truss</SectionName>
+  <SectionManufactor>RigCalc</SectionManufactor>
+  <CrossAreaSection_CM2>12.5</CrossAreaSection_CM2>
+  <Az_CM2>4.5</Az_CM2>
+  <Ay_CM2>5.5</Ay_CM2>
+  <Ixx_CM4>100</Ixx_CM4>
+  <Iyy_CM4>200</Iyy_CM4>
+  <Izz_CM4>300</Izz_CM4>
+  <MaxNx_KN>30</MaxNx_KN>
+  <MaxVy_KN>12</MaxVy_KN>
+  <MaxVz_KN>10</MaxVz_KN>
+  <MaxMt_KNM>2</MaxMt_KNM>
+  <MaxMby_KNM>8</MaxMby_KNM>
+  <MaxMbz_KNM>7</MaxMbz_KNM>
+</CrossSectionEntity>

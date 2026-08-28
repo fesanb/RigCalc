@@ -86,24 +86,43 @@ def build_station_map(ordered, lookup, connections):
         last = lookup[ordered[-1]]
         if len(ordered) == 1:
             points = (first.start, first.end)
-            x_extent = abs(first.end.x - first.start.x)
-            y_extent = abs(first.end.y - first.start.y)
-            key = (lambda p: (p.x, p.y)) if x_extent >= y_extent else (lambda p: (p.y, p.x))
+            extents = (
+                abs(first.end.x - first.start.x),
+                abs(first.end.y - first.start.y),
+                abs(first.end.z - first.start.z),
+            )
+            dominant = max(range(3), key=lambda index: extents[index])
+            coordinates = (
+                lambda p: (p.x, p.y, p.z),
+                lambda p: (p.y, p.x, p.z),
+                lambda p: (p.z, p.x, p.y),
+            )
+            key = coordinates[dominant]
             origin, terminal = min(points, key=key), max(points, key=key)
         else:
             _, first_port = _connection_for(connections, first.id, ordered[1])
             _, last_port = _connection_for(connections, last.id, ordered[-2])
             origin = first.end if first_port == "start" else first.start
             terminal = last.end if last_port == "start" else last.start
-        dx, dy = terminal.x - origin.x, terminal.y - origin.y
-        span = (dx * dx + dy * dy) ** 0.5
+        dx = terminal.x - origin.x
+        dy = terminal.y - origin.y
+        dz = terminal.z - origin.z
+        span = (dx * dx + dy * dy + dz * dz) ** 0.5
         if span > 1e-6:
-            ux, uy = dx / span, dy / span
+            ux, uy, uz = dx / span, dy / span, dz / span
             station_map = {}
             for truss_id in ordered:
                 truss = lookup[truss_id]
-                start_projection = (truss.start.x - origin.x) * ux + (truss.start.y - origin.y) * uy
-                end_projection = (truss.end.x - origin.x) * ux + (truss.end.y - origin.y) * uy
+                start_projection = (
+                    (truss.start.x - origin.x) * ux +
+                    (truss.start.y - origin.y) * uy +
+                    (truss.start.z - origin.z) * uz
+                )
+                end_projection = (
+                    (truss.end.x - origin.x) * ux +
+                    (truss.end.y - origin.y) * uy +
+                    (truss.end.z - origin.z) * uz
+                )
                 direction = "forward" if start_projection <= end_projection else "reverse"
                 station_map[truss_id] = StationRange(
                     min(start_projection, end_projection), max(start_projection, end_projection), direction)

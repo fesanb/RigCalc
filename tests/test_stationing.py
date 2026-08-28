@@ -12,6 +12,17 @@ def line(identifier, start_x, end_x):
 
 
 class StationingTests(unittest.TestCase):
+    def test_vectorworks_system_name_becomes_construction_id_after_topology(self):
+        start, middle, end = Point3D(0, 0), Point3D(3000, 0), Point3D(6000, 0)
+        document = DocumentModel(trusses=[
+            TrussSegment("T1", "", "Line", start, 3000, start, middle,
+                         vw_truss_system="LX1"),
+            TrussSegment("T2", "", "Line", middle, 3000, middle, end,
+                         vw_truss_system="LX2"),
+        ])
+        construction = build_constructions(document)[0]
+        self.assertEqual(construction.id, "LX1+LX2")
+
     def test_station_zero_is_smallest_x_independent_of_object_direction(self):
         document = DocumentModel(trusses=[line("B", 4500, 3000), line("A", 3000, 0)])
         construction = build_constructions(document)[0]
@@ -25,6 +36,20 @@ class StationingTests(unittest.TestCase):
         self.assertAlmostEqual(construction.nominal_truss_length_mm, 4500)
         # This assertion documents the required geometry milestone.
         self.assertAlmostEqual(construction.structural_span_mm, 4261)
+
+    def test_sloped_chain_uses_true_3d_station_length(self):
+        first = TrussSegment(
+            "A", "A", "Line", Point3D(0, 0, 0), 3000,
+            Point3D(0, 0, 0), Point3D(1800, 0, 2400),
+        )
+        second = TrussSegment(
+            "B", "B", "Line", Point3D(1800, 0, 2400), 3000,
+            Point3D(1800, 0, 2400), Point3D(3600, 0, 4800),
+        )
+        construction = build_constructions(DocumentModel(trusses=[first, second]))[0]
+        self.assertAlmostEqual(construction.structural_span_mm, 6000)
+        self.assertAlmostEqual(construction.station_map["A"].end_station_mm, 3000)
+        self.assertAlmostEqual(construction.station_map["B"].end_station_mm, 6000)
 
 
 if __name__ == "__main__":

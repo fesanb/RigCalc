@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MaterialEntity Ident="TEST-AL">
+  <MaterialName>TEST-AL</MaterialName>
+  <EModul_Pascal>70000000000</EModul_Pascal>
+  <GModul_Pascal>26500000000</GModul_Pascal>
+  <V_None>0.3</V_None>
+  <Density_KGM3>2700</Density_KGM3>
+</MaterialEntity>

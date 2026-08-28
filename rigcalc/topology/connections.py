@@ -1,7 +1,7 @@
 from rigcalc import config
 from rigcalc.model.construction import Connection
 
-from .geometry import bbox_distance, distance_2d, parallel_angle_difference, point_to_segment
+from .geometry import bbox_distance, distance_3d, parallel_angle_difference, point_to_segment
 
 
 def _endpoint_pairs(a, b):
@@ -15,7 +15,7 @@ def _endpoint_pairs(a, b):
 
 def find_line_line_connection(a, b):
     candidates = sorted(
-        (distance_2d(ap, bp), aport, bport)
+        (distance_3d(ap, bp), aport, bport)
         for aport, ap, bport, bp in _endpoint_pairs(a, b)
     )
     distance, aport, bport = candidates[0]
@@ -27,16 +27,16 @@ def find_line_line_connection(a, b):
 
     relaxed = []
     for aport, point, other in (("start", a.start, b), ("end", a.end, b)):
-        lateral, _, _, _ = point_to_segment(point, other.start, other.end)
-        distances = ((distance_2d(point, other.start), "start"),
-                     (distance_2d(point, other.end), "end"))
+        lateral, _, _, _, _ = point_to_segment(point, other.start, other.end)
+        distances = ((distance_3d(point, other.start), "start"),
+                     (distance_3d(point, other.end), "end"))
         longitudinal, bport = min(distances)
         if lateral <= config.COLLINEAR_LATERAL_TOLERANCE_MM and longitudinal <= config.COLLINEAR_LONGITUDINAL_TOLERANCE_MM:
             relaxed.append((longitudinal, aport, bport))
     for bport, point, other in (("start", b.start, a), ("end", b.end, a)):
-        lateral, _, _, _ = point_to_segment(point, other.start, other.end)
-        distances = ((distance_2d(point, other.start), "start"),
-                     (distance_2d(point, other.end), "end"))
+        lateral, _, _, _, _ = point_to_segment(point, other.start, other.end)
+        distances = ((distance_3d(point, other.start), "start"),
+                     (distance_3d(point, other.end), "end"))
         longitudinal, aport = min(distances)
         if lateral <= config.COLLINEAR_LATERAL_TOLERANCE_MM and longitudinal <= config.COLLINEAR_LONGITUDINAL_TOLERANCE_MM:
             relaxed.append((longitudinal, aport, bport))

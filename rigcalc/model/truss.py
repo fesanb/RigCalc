@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from .geometry import BoundingBox, Point3D
+from .section import MechanicalSection
 
 
 @dataclass
@@ -18,8 +19,15 @@ class TrussSegment:
     symbol: str = ""
     truss_type: str = ""
     corner_type: str = ""
+    width_mm: float = 0.0
+    height_mm: float = 0.0
+    self_weight_kg: float = 0.0
+    cross_section_id: str = ""
+    mechanical_section: Optional[MechanicalSection] = None
+    cross_section_issues: list = field(default_factory=list)
     vw_truss_system: str = ""
     vw_truss_line: str = ""
+    source_position_name: str = ""
     vw_connections: Dict[str, str] = field(default_factory=dict)
     source_ref: Any = field(default=None, repr=False, compare=False)
 
