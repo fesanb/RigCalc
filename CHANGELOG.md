@@ -1,28 +1,32 @@
 # Changelog
 
-Alle vesentlige endringer i RigCalc dokumenteres her.
+All notable changes to RigCalc are documented in this file.
 
-## Under utvikling
+## Unreleased
 
-### Lagt til
+### Added
 
-- Lineær kontinuerlig-bjelkeanalyse og korotasjonell 3D-rammeanalyse.
-- Sammenligning av solverresultater og valg av validert primærberegning.
-- Mekaniske tverrsnitt fra Vectorworks XML, inkludert kapasitetsdata.
-- Støtte for Hanging Positions, dead hangs, Truss Cross og lagavgrensning.
-- Automatisk Hoist-ID, High Hook-writeback og Truss Cross-writeback.
-- Last-, deformasjon- og snittkraftvarsler i egne Vectorworks-klasser.
-- Fremdriftsvisning, avbrytbar kjøring og samlet kjøringssammendrag.
-- Diagnostisk inventar og normalisert datakontrakt for utvikling.
-- Tester for geometri, normalisering, solvere, writeback og varsler.
+- Linear continuous-beam analysis and corotational 3D frame analysis.
+- Solver-result comparison and selection of a validated primary calculation.
+- Mechanical cross sections from Vectorworks XML, including capacity data.
+- Support for Hanging Positions, dead hangs, Truss Cross objects, and layer
+  filtering.
+- Automatic Hoist IDs, High Hook writeback, and Truss Cross writeback.
+- Load, deflection, and internal-force notifications in dedicated Vectorworks
+  classes.
+- Progress reporting, cancelable execution, and a consolidated run summary.
+- A diagnostic inventory and normalized data contract for development.
+- Tests for geometry, normalization, solvers, writeback, and notifications.
 
-### Endret
+### Changed
 
-- 3D-geometri brukes ved kobling, stasjonering og avstandskontroll.
-- Uklare eller geometrisk umulige koblinger beholdes som eksplisitte avvik.
-- Genererte rapporter er utvidet med beregning, sammenligning og writeback.
+- Connections, stationing, and distance checks now use 3D geometry.
+- Ambiguous or geometrically impossible connections remain visible as explicit
+  issues.
+- Generated reports now include calculations, solver comparison, and
+  writeback results.
 
-### Sikkerhet
+### Security
 
-- Beregninger er fortsatt eksperimentelle og skal kontrolleres av kvalifisert
-  personell før de brukes i rigg- eller løftebeslutninger.
+- Calculations remain experimental and must be reviewed by qualified personnel
+  before they are used for rigging or lifting decisions.

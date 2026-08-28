@@ -3,20 +3,20 @@
 [![Tests](https://github.com/fesanb/RigCalc/actions/workflows/tests.yml/badge.svg)](https://github.com/fesanb/RigCalc/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-RigCalc leser riggegeometri fra Vectorworks Spotlight, bygger en inspiserbar
-Python-modell og utfører foreløpige statiske analyser av trusskonstruksjoner.
-Programmet beregner reaksjoner, deformasjoner og snittkrefter med både en
-lineær bjelkemodell og en korotasjonell 3D-modell. Validerte resultater kan
-skrives tilbake til Hoist- og Truss Cross-objekter i Vectorworks.
+RigCalc reads rigging geometry from Vectorworks Spotlight, builds an
+inspectable Python model, and performs preliminary structural analysis of
+truss constructions. It calculates reactions, deflections, and internal
+forces with both a linear beam model and a corotational 3D model. Validated
+results can be written back to Hoist and Truss Cross objects in Vectorworks.
 
 > [!WARNING]
-> RigCalc er eksperimentell programvare. Resultater må ikke brukes som eneste
-> grunnlag for sikkerhetskritiske rigg- eller løftebeslutninger. Beregninger og
-> forutsetninger må kontrolleres av kvalifisert personell.
+> RigCalc is experimental software. Its results must not be used as the sole
+> basis for safety-critical rigging or lifting decisions. Calculations and
+> assumptions must be reviewed by qualified personnel.
 
-## Migrering fra LoadCalc
+## Migration from LoadCalc
 
-Produktmappen og Python-pakken er omdøpt:
+The product directory and Python package have been renamed:
 
 ```text
 LoadCalc/          -> RigCalc/
@@ -24,31 +24,33 @@ loadcalc/          -> rigcalc/
 loadcalc_geometry  -> rigcalc_geometry
 ```
 
-En gammel Vectorworks-loader vil ikke fungere etter denne endringen. Kopier
-hele den nye `RigCalc/loader.py` inn i Vectorworks-scriptet og kontroller at
-`RIGCALC_REPO_DIR` peker på den nye `RigCalc`-mappen. Dette må gjøres én gang.
+An old Vectorworks loader will not work after this change. Copy the complete
+new `RigCalc/loader.py` into the Vectorworks script and verify that
+`RIGCALC_REPO_DIR` points to the new `RigCalc` directory. This is a one-time
+update.
 
-## Filen som skal inn i Vectorworks
+## Vectorworks loader
 
-Den komplette loaderen ligger i:
+The complete loader is located at:
 
 ```text
 RigCalc/loader.py
 ```
 
-Dette er den eneste prosjektfilen som skal kopieres inn i Vectorworks Resource
-Manager. Selve RigCalc-koden skal fortsatt ligge eksternt i Git-repoet.
+This is the only project file that should be copied into the Vectorworks
+Resource Manager. The RigCalc source code remains external in the Git
+repository.
 
-### Installere loaderen
+### Installing the loader
 
-1. Åpne `RigCalc/loader.py` i en teksteditor.
-2. Kopier **hele filinnholdet**.
-3. Opprett eller åpne en Python Script-resource i Vectorworks Resource Manager.
-4. Erstatt gammelt scriptinnhold med loaderen og lagre.
-5. Endre `RIGCALC_REPO_DIR` øverst i loaderen dersom repoet ligger et annet
-   sted på maskinen.
+1. Open `RigCalc/loader.py` in a text editor.
+2. Copy the entire file.
+3. Create or open a Python Script resource in the Vectorworks Resource Manager.
+4. Replace the existing script contents with the loader and save it.
+5. Change `RIGCALC_REPO_DIR` near the top of the loader if the repository is
+   stored elsewhere on the machine.
 
-Eksempel:
+Example:
 
 ```python
 RIGCALC_REPO_DIR = (
@@ -56,12 +58,12 @@ RIGCALC_REPO_DIR = (
 )
 ```
 
-Stien skal peke på mappen som inneholder både `rigcalc/`, `loader.py` og denne
-README-filen:
+The path must point to the directory containing `rigcalc/`, `loader.py`, and
+this README:
 
 ```text
 VWDEV/
-└── RigCalc/                  <-- RIGCALC_REPO_DIR peker hit
+└── RigCalc/                  <-- RIGCALC_REPO_DIR points here
     ├── loader.py
     ├── README.md
     ├── rigcalc/
@@ -70,32 +72,32 @@ VWDEV/
     └── tests/
 ```
 
-Ikke sett stien til bare `VWDEV`, og ikke sett den til
-`RigCalc/rigcalc`. Loaderen kontrollerer stien og viser en forståelig feil
-dersom `rigcalc/__init__.py` ikke finnes.
+Do not point it at `VWDEV` alone or at `RigCalc/rigcalc`. The loader validates
+the path and displays a clear error if `rigcalc/__init__.py` cannot be found.
 
-## Normal utviklingsflyt
+## Development workflow
 
-Etter at loaderen er installert én gang:
+After installing the loader once:
 
-1. Rediger filene under `RigCalc/rigcalc/` i VS Code.
-2. Lagre endringene.
-3. Kjør RigCalc-scriptet fra Vectorworks.
-4. Loaderen tømmer import-cachen og kjører siste lagrede kode.
+1. Edit files under `RigCalc/rigcalc/` in VS Code.
+2. Save the changes.
+3. Run the RigCalc script from Vectorworks.
+4. The loader clears the import cache and runs the latest saved code.
 
-Vectorworks trenger normalt ikke startes på nytt, og loaderen trenger ikke
-kopieres inn på nytt ved vanlige kodeendringer. Den må bare oppdateres dersom
-selve `loader.py` eller repo-stien endres.
+Vectorworks normally does not need to be restarted, and the loader does not
+need to be copied again for ordinary code changes. Update it only when
+`loader.py` itself or the repository path changes.
 
 ## Output
 
-Før rapportene skrives viser RigCalc en dialog med beregningsrelevante
-designlag. Bare valgte lag tas med i geometrimodellen. Velg derfor lag som
-inneholder hengende konstruksjon og utstyr, og la gulv-, lager- og
-presentasjonslag være avslått. Siste valg huskes som forslag til neste
-kjøring, men dialogen vises alltid.
+Before writing reports, RigCalc displays a dialog containing the
+calculation-relevant design layers. Only selected layers are included in the
+geometry model. Select layers containing suspended structures and equipment,
+and leave floor, storage, venue, and presentation layers disabled. The last
+selection is remembered as a suggestion for the next run, but the dialog is
+always displayed.
 
-En vellykket kjøring skriver uten å åpne Notepad:
+A successful run writes the following files without opening Notepad:
 
 ```text
 RigCalc/output/rigcalc_geometry.txt
@@ -117,131 +119,133 @@ RigCalc/output/rigcalc_notification_writeback.json
 RigCalc/output/rigcalc_run_summary.json
 ```
 
-TXT-filen er beregnet for rask menneskelig kontroll. JSON-filen inneholder den
-detaljerte modellen som kan analyseres og brukes i tester.
+The TXT files are intended for quick human review. The JSON files contain the
+detailed model for analysis and testing.
 
-Når utviklingsdiagnostikk er aktivert, skrives også
-`rigcalc_inventory.json` og `rigcalc_normalized.json`.
-`rigcalc_inventory.json` er en skrivebeskyttet diagnostisk inventering av alle
-plug-in-objekter (`T=86`), med plug-in-type, lag, klasse, posisjon og alle
-tilknyttede records og felt. Den brukes til å kartlegge Spotlight-objekter før
-de tas inn i lastmodellen, og endrer ikke Vectorworks-dokumentet.
+When development diagnostics are enabled, RigCalc also writes
+`rigcalc_inventory.json` and `rigcalc_normalized.json`.
+`rigcalc_inventory.json` is a read-only diagnostic inventory of every plug-in
+object (`T=86`), including its plug-in type, layer, class, position, and all
+associated records and fields. It is used to map Spotlight objects before
+they enter the load model and does not modify the Vectorworks document.
 
-`rigcalc_normalized.json` er den stabile, kalkulasjonsrettede datakontrakten.
-Hver masse og kobling beholder kildefelt, originalverdi og eventuelle
-datakvalitetsvarsler. Ukjente tall uten eksplisitt enhet blir ikke antatt å
-være kilogram.
+`rigcalc_normalized.json` is the stable, calculation-facing data contract.
+Every mass and connection retains its source field, original value, and any
+data-quality warnings. Bare numbers without an explicit unit are not assumed
+to be kilograms.
 
-Full inventar- og normaliseringsdiagnostikk er deaktivert i standardkjøringen
-fordi den leser alle records og nested objekter og ikke er nødvendig for
-beregningen. Sett `WRITE_DEVELOPMENT_INVENTORY = True` i `rigcalc/config.py`
-når disse rapportene skal regenereres. Standardkjøringen bruker en lett
-lagindeks og detaljleser bare valgte beregningsobjekter og Hanging Positions.
+Full inventory and normalization diagnostics are disabled during normal runs
+because they read every record and nested object and are not required for the
+calculation. Set `WRITE_DEVELOPMENT_INVENTORY = True` in `rigcalc/config.py`
+to regenerate these reports. A normal run uses a lightweight layer index and
+reads detailed data only for selected calculation objects and Hanging
+Positions.
 
-Under kjøring viser Vectorworks fremdrift for lagindeks, modellbygging,
-lineær analyse og ikke-lineær analyse. Den ikke-lineære fasen viser
-konstruksjon, lastprosent og Newton-iterasjon.
+During execution, Vectorworks displays progress for layer indexing, model
+construction, linear analysis, and nonlinear analysis. The nonlinear phase
+shows the construction, load percentage, and Newton iteration.
 
-Etter kjøringen viser Vectorworks et sammendrag med antall objekter,
-beregnede konstruksjoner, writeback-resultater, frigjorte motorstøtter og
-objekter som ikke kunne behandles.
+After the run, Vectorworks displays a summary with object counts, calculated
+constructions, writeback results, released hoist supports, and objects that
+could not be processed.
 
-Genererte TXT- og JSON-rapporter ignoreres av Git. `output/.gitkeep` sørger for
-at selve output-mappen finnes etter kloning.
+Generated TXT and JSON reports are ignored by Git. `output/.gitkeep` ensures
+that the output directory exists after cloning.
 
-## Feilsøking
+## Troubleshooting
 
-En feil i loaderen eller RigCalc skriver full traceback til:
+A loader or RigCalc failure writes the complete traceback to:
 
 ```text
 %TEMP%\VWDEV\rigcalc_error.txt
 ```
 
-Vectorworks viser bare en kort feilmelding med plasseringen til denne filen.
-Kontroller først at `RIGCALC_REPO_DIR` peker på riktig `RigCalc`-mappe.
+Vectorworks displays only a short error message with the path to this file.
+First verify that `RIGCALC_REPO_DIR` points to the correct `RigCalc` directory.
 
-## Arkitekturregel
+## Architecture
 
-Bare `rigcalc/vw/` skal kjenne til Vectorworks API. Modell-, topologi- og
-rapportmodulene skal kunne importeres og testes uten Vectorworks.
+Only `rigcalc/vw/` may depend on the Vectorworks API. Model, topology, solver,
+and report modules must remain importable and testable without Vectorworks.
 
-Flyten er:
+The main data flow is:
 
 ```text
-Vectorworks -> vw/scanner -> intern modell -> topology -> solver -> report/writeback
+Vectorworks -> vw/scanner -> internal model -> topology -> solver -> report/writeback
 ```
 
-Solverne og rapportmodulene er rene Python-moduler og kan testes uten
-Vectorworks. `rigcalc/vw/` håndterer skanning, dialoger, fremdrift og alle
-endringer i det åpne Vectorworks-dokumentet.
+The solvers and report modules are pure Python. `rigcalc/vw/` handles scanning,
+dialogs, progress reporting, and all changes to the open Vectorworks document.
 
-## Beregning og writeback
+## Calculation and writeback
 
-RigCalc grupperer sammenhengende truss til konstruksjoner og knytter motorer,
-dead hangs, punktlaster, fordelte laster og Truss Cross-objekter til dem.
-Mekaniske tverrsnitt leses fra Vectorworks-data og konverteres til SI-enheter.
-Konstruksjoner uten tilstrekkelige tverrsnittsdata eller entydig geometri blir
-rapportert, men får ikke resultater skrevet tilbake.
+RigCalc groups connected truss into constructions and attaches hoists, dead
+hangs, point loads, distributed loads, and Truss Cross objects. Mechanical
+cross sections are read from Vectorworks data and converted to SI units.
+Constructions without sufficient cross-section data or unambiguous geometry
+are reported but do not receive writeback results.
 
-Den lineære og den korotasjonelle analysen sammenlignes før et primærresultat
-velges. Ikke-konvergerte ikke-lineære resultater forkastes. Motorstøtter som
-ville kreve en negativ reaksjon, frigis og systemet løses på nytt. Godkjente
-motorreaksjoner skrives til High Hook-feltene, og krefter i strukturelle
-Truss Cross-koblinger skrives tilbake i newton.
+The linear and corotational analyses are compared before a primary result is
+selected. Non-converged nonlinear results are rejected. Hoist supports that
+would require a negative reaction are released and the system is solved
+again. Approved hoist reactions are written to the High Hook fields, and
+forces in structural Truss Cross connections are written back in newtons.
 
-Writeback skjer automatisk som del av en normal kjøring. Arbeid derfor i en
-kopi eller et versjonskontrollert Vectorworks-dokument når nye datasett
-valideres.
+Writeback happens automatically during a normal run. Work in a copy or a
+version-controlled Vectorworks document when validating new datasets.
 
-## Lastvarsler i tegningen
+## In-document notifications
 
-Etter at primærberegningen er valgt, kontrollerer RigCalc reaksjonslasten ved
-hver motor mot motorens kapasitet. En reaksjonslast over kapasiteten oppretter
-en rød tekstmarkør med hvit tekst ved motoren i klassen `RigCalc-Load`.
-Markøren er ett enkelt tekstobjekt uten tekstbryting eller Tight Fill. Fyll,
-fyllmønster og pennfarge står til By Class. Når varslingsklassene opprettes
-første gang, får de standardfarge og hvit penn; eksisterende klasser endres
-aldri av RigCalc.
-Markøren viser varseltype, motor-ID og kapasitetsutnyttelse på tre linjer.
-Kapasiteten sammenlignes
-med lasten ved lower hook; motor- og kjedevekt i High Hook-verdien inngår ikke
-i denne kapasitetskontrollen.
+After selecting the primary calculation, RigCalc checks the reaction at each
+hoist against its rated capacity. A reaction above capacity creates a red
+marker with white text near the hoist in the `RigCalc-Load` class. The marker
+is a single text object without text wrapping or Tight Fill. Fill, fill
+pattern, and pen color use By Class settings. New notification classes receive
+default colors and a white pen when first created; RigCalc never modifies an
+existing class.
 
-RigCalc gir genererte markører et internt objektnavn. Ved neste kjøring
-slettes og regenereres alle disse tekstobjektene. Andre objekter brukeren har
-lagt i `RigCalc-Load`, blir ikke endret eller slettet. Varslingsdata og resultatet av
-skrivingen lagres i henholdsvis `rigcalc_notifications.json` og
-`rigcalc_notification_writeback.json` i output-mappen.
+The marker contains the warning type, hoist ID, and utilization on three
+lines. Capacity is compared with the lower-hook reaction; hoist and chain mass
+included in the High Hook value does not enter this capacity check.
 
-Beregningsrapportene inneholder også vertikal defleksjon i midten av hvert
-spenn mellom aktive oppheng, maksimal beregnet defleksjon i hvert spenn og
-maksimal defleksjon for hele konstruksjonen. Hvert spenn får en informativ
-oransje tekstmarkør i `RigCalc-Deflection`. Det settes foreløpig ikke en
-feilgrense fordi tillatt defleksjon må fastsettes per prosjekt eller system.
+RigCalc assigns an internal object name to generated markers. On the next run,
+these markers are deleted and regenerated. User-created objects in
+`RigCalc-Load` are preserved. Notification data and writeback results are
+stored in `rigcalc_notifications.json` and
+`rigcalc_notification_writeback.json`, respectively.
 
-Interne elementkrefter kontrolleres komponentvis mot `MaxNx`, `MaxVy`,
-`MaxVz`, `MaxMt`, `MaxMby` og `MaxMbz` fra Braceworks cross-section-XML.
-Verdien null behandles som manglende kapasitet. Overskridelser samles per
-snitt og vises som blå tekstmarkører i `RigCalc-Internal`. Kontrollen antar
-ikke en interaksjonsformel mellom aksialkraft og moment.
+Calculation reports also contain vertical deflection at the midpoint of each
+span between active supports, the maximum calculated deflection in each span,
+and the maximum deflection for the entire construction. Each span receives an
+informational orange marker in `RigCalc-Deflection`. No failure threshold is
+currently applied because allowable deflection must be defined per project or
+system.
 
-## Kjøre tester
+Internal element forces are checked component by component against `MaxNx`,
+`MaxVy`, `MaxVz`, `MaxMt`, `MaxMby`, and `MaxMbz` from the Braceworks
+cross-section XML. A zero value is treated as a missing capacity. Exceedances
+are grouped by section and displayed as blue markers in `RigCalc-Internal`.
+The check does not assume an interaction equation between axial force and
+moment.
 
-Fra `RigCalc`-mappen, med Python-runtime som følger Vectorworks 2026:
+## Running tests
+
+From the `RigCalc` directory, using the Python runtime bundled with
+Vectorworks 2026:
 
 ```powershell
 & 'C:\Program Files\Vectorworks 2026\Python39\python.exe' -B -m unittest discover -s tests -v
 ```
 
-`-B` hindrer at testen oppretter `__pycache__`-filer i repoet.
+`-B` prevents the tests from creating `__pycache__` files in the repository.
 
-## Bidrag og sikkerhet
+## Contributing and security
 
-Se [CHANGELOG.md](CHANGELOG.md) for vesentlige endringer og
-[CONTRIBUTING.md](CONTRIBUTING.md) før du foreslår større endringer. Ikke
-publiser sårbarheter eller sensitiv prosjektinformasjon i en offentlig issue;
-følg i stedet [SECURITY.md](SECURITY.md).
+See [CHANGELOG.md](CHANGELOG.md) for notable changes and
+[CONTRIBUTING.md](CONTRIBUTING.md) before proposing substantial work. Do not
+publish vulnerabilities or sensitive project information in a public issue;
+follow [SECURITY.md](SECURITY.md) instead.
 
-## Lisens
+## License
 
-RigCalc distribueres under [MIT-lisensen](LICENSE).
+RigCalc is distributed under the [MIT License](LICENSE).
