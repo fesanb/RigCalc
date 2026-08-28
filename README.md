@@ -185,6 +185,17 @@ cross sections are read from Vectorworks data and converted to SI units.
 Constructions without sufficient cross-section data or unambiguous geometry
 are reported but do not receive writeback results.
 
+The initial calculation-scope dialog also accepts a cable load in kg/m and a
+global safety factor. Both values are remembered between runs. Cable load
+defaults to zero and the safety factor defaults to 1.00. Cable load is applied as a
+separate distributed load over the physical length of every selected line
+truss. The safety factor is applied once to all scanned loads, including
+cable, truss self-weight, equipment, hoist and chain, and bridle parts; a
+transferred reaction is not factored again. Soft Goods use their total weight, distributed weight, length, and top
+trim fields. Dead-hang rigging weight comes from the Bridle object's dynamic
+`TotalWeight`, so changes made through Bridle Parts are reflected on the next
+scan without a RigCalc-specific parts table.
+
 The linear and corotational analyses are compared before a primary result is
 selected. Non-converged nonlinear results are rejected. Hoist supports that
 would require a negative reaction are released and the system is solved

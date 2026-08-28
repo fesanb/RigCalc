@@ -41,6 +41,14 @@ class DeadHangTests(unittest.TestCase):
         })
         self.assertIsNone(support)
 
+    def test_safety_factor_applies_to_dynamic_bridle_parts_weight(self):
+        support = _parse_dead_hang(FakeVS(), "handle", "D195", {
+            "Name": "Bridle", "AsDrop": "True",
+            "BridleType": "DeadHang", "HouseRiggingPoint1": "upper-port",
+            "TotalWeight": "6550",
+        }, safety_factor=1.1)
+        self.assertAlmostEqual(support.weight_with_chain_kg, 7.205)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,14 @@
 import unittest
 import tempfile
 
-from rigcalc.vw.layer_dialog import candidate_layers, choose_calculation_layers
+from rigcalc.vw.layer_dialog import (candidate_layers,
+                                      choose_calculation_scope)
 
 
 class FakeDialogVS:
     def __init__(self):
         self.states = {}
+        self.text = {}
         self.closed = False
         self.alerts = []
 
@@ -15,13 +17,19 @@ class FakeDialogVS:
     def SetFirstLayoutItem(self, *args): pass
     def SetBelowItem(self, *args): pass
     def CreateCheckBox(self, *args): pass
+    def CreateEditText(self, dialog, item, value, width): self.text[item] = value
+    def SetRightItem(self, *args): pass
+    def SetItemText(self, dialog, item, value): self.text[item] = value
+    def GetItemText(self, dialog, item): return self.text.get(item, "")
     def SetBooleanItem(self, dialog, item, state): self.states[item] = state
     def GetBooleanItem(self, dialog, item): return False if self.closed else self.states.get(item, False)
     def AlrtDialog(self, text): self.alerts.append(text)
 
     def RunLayoutDialog(self, dialog, handler):
         handler(12255, None)
-        self.states[10] = True  # User checks the only layer.
+        self.states[100] = True  # User checks the only layer.
+        self.text[8] = "2,00"
+        self.text[20] = "1,10"
         handler(1, None)
         self.closed = True
         return 1
@@ -41,8 +49,10 @@ class LayerDialogTests(unittest.TestCase):
         vs = FakeDialogVS()
         inventory = [{"layer_name": "Rigging", "parametric_record": "TrussItem"}]
         with tempfile.TemporaryDirectory() as directory:
-            selected = choose_calculation_layers(vs, inventory, directory)
-        self.assertEqual(selected, ["Rigging"])
+            scope = choose_calculation_scope(vs, inventory, directory)
+        self.assertEqual(scope["selected"], ["Rigging"])
+        self.assertEqual(scope["cable_load_kg_m"], 2.0)
+        self.assertEqual(scope["safety_factor"], 1.1)
         self.assertEqual(vs.alerts, [])
 
 

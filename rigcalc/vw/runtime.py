@@ -6,7 +6,7 @@ from .scanner import scan_document
 from .inventory import scan_plugin_inventory
 from .hanging_position import extract_hanging_position_trusses
 from .hoist_ids import populate_missing_hoist_ids
-from .layer_dialog import choose_calculation_layers
+from .layer_dialog import choose_calculation_scope
 from .writer import report_output_directory, write_reports
 from .progress import RigCalcCancelled, VWProgress
 
@@ -24,7 +24,7 @@ def run(vs_module=None):
         elif action == "close":
             display.close()
         else:
-            display.pulse(message or "RigCalc arbeider")
+            display.pulse(message or "RigCalc is working")
 
     try:
         # The layer prompt only needs record and layer names. Keep this first
@@ -35,10 +35,13 @@ def run(vs_module=None):
         display.close()
         return None
     display.close()
-    included_layers = choose_calculation_layers(
+    scope = choose_calculation_scope(
         vs_module, inventory, report_output_directory())
-    if included_layers is None:
+    if scope is None:
         return None
+    included_layers = scope["selected"]
+    cable_load_kg_m = scope["cable_load_kg_m"]
+    safety_factor = scope["safety_factor"]
     display.begin_workflow(7)
     try:
         hoist_id_assignment = populate_missing_hoist_ids(vs_module)
@@ -49,7 +52,9 @@ def run(vs_module=None):
                 vs_module, progress=progress, detailed=True,
                 included_layers=included_layers)
         document = scan_document(
-            vs_module, included_layers=included_layers, progress=progress)
+            vs_module, included_layers=included_layers, progress=progress,
+            cable_load_kg_m=cable_load_kg_m,
+            safety_factor=safety_factor)
         if config.WRITE_DEVELOPMENT_INVENTORY:
             hanging_position_inventory = [
                 item for item in inventory
@@ -62,14 +67,16 @@ def run(vs_module=None):
                 included_layers=included_layers)
         document.trusses.extend(extract_hanging_position_trusses(
             hanging_position_inventory, included_layers))
-        progress("start", 4, "Klargjør konstruksjoner 0/4")
+        progress("start", 4, "Preparing constructions 0/4")
         assign_cross_sections(document.trusses)
-        progress("update", 2, "Bygger konstruksjonstopologi 2/4")
+        progress("update", 2, "Building construction topology 2/4")
         constructions = build_constructions(document)
-        progress("update", 4, "Konstruksjoner ferdige 4/4")
+        progress("update", 4, "Constructions ready 4/4")
         return write_reports(
             vs_module, document, constructions, inventory,
             included_layers=included_layers, progress=progress,
+            cable_load_kg_m=cable_load_kg_m,
+            safety_factor=safety_factor,
             hoist_id_assignment=hoist_id_assignment,
         )
     except RigCalcCancelled:

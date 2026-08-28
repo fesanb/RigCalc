@@ -24,6 +24,17 @@ class NormalizationTests(unittest.TestCase):
         self.assertEqual(component["mass_per_m_kg"], 100.0)
         self.assertAlmostEqual(component["length_mm"], 2132.525)
 
+    def test_soft_goods_is_always_a_distributed_load(self):
+        component = load_components("Soft Goods", {
+            "WeightKG": "45,37114508",
+            "DistWeightKG": "15,87",
+            "AdjustableLength": "2,85892533597916e03",
+        })[0]
+        self.assertEqual(component["kind"], "distributed")
+        self.assertAlmostEqual(component["mass_kg"], 45.37114508)
+        self.assertAlmostEqual(component["mass_per_m_kg"], 15.87)
+        self.assertAlmostEqual(component["length_mm"], 2858.92533597916)
+
     def test_uuid_connection_resolves_to_truss_and_port(self):
         inventory = [
             {

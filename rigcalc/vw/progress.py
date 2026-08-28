@@ -6,7 +6,7 @@ class RigCalcCancelled(Exception):
 
 
 class VWProgress:
-    def __init__(self, vs, title="RigCalc arbeider"):
+    def __init__(self, vs, title="RigCalc | Calculation in Progress"):
         self.vs = vs
         self.title = title
         self.opened = False
@@ -34,17 +34,17 @@ class VWProgress:
             self.vs.ProgressDlgOpen(self.title, True)
             self.opened = True
             self.vs.ProgressDlgSetBotMsg(
-                "RigCalc arbeider. Trykk Avbryt for å stoppe før writeback.")
+                "You may cancel safely before result writeback begins.")
         except Exception:
             self.opened = False
 
     def _phase_summary(self):
         lines = []
         for index, name in enumerate(self.phase_names):
-            state = "ferdig" if index < self.phase_index else "kjører"
-            lines.append("{}: {}".format(state, name))
+            state = "[DONE]" if index < self.phase_index else "[RUN ]"
+            lines.append("{} {}".format(state, name))
         remaining = self.phase_count-len(self.phase_names)
-        lines.extend("venter: neste fase" for _ in range(max(0, remaining)))
+        lines.extend("[....] Pending phase" for _ in range(max(0, remaining)))
         return "\n".join(lines)
 
     def start(self, total, message):
@@ -59,8 +59,7 @@ class VWProgress:
             self.total = max(1, int(total))
             self.phase_names.append(message.split(" 0/")[0])
             try:
-                self.vs.ProgressDlgStart(
-                    100.0/self.phase_count, self.total)
+                self.vs.ProgressDlgStart(100.0/self.phase_count, self.total)
                 self.vs.ProgressDlgSetTopMsg(self._phase_summary())
                 self.vs.ProgressDlgSetMeter(message)
             except Exception:

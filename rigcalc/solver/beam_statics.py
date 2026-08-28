@@ -18,6 +18,21 @@ def trace_construction_loads(construction):
                                station.end_station_mm) / 2.0,
                 "evidence": "TrussItem.Weight",
             })
+        if station and truss.cable_load_kg_m > 0:
+            length_m = truss.geometric_length_mm / 1000.0
+            loads.append({
+                "source_id": "{}:cable".format(truss.id),
+                "source_type": "cable_flat_rate",
+                "mass_kg": truss.cable_load_kg_m * length_m,
+                "station_mm": (station.start_station_mm +
+                               station.end_station_mm) / 2.0,
+                "interval_start_mm": min(
+                    station.start_station_mm, station.end_station_mm),
+                "interval_end_mm": max(
+                    station.start_station_mm, station.end_station_mm),
+                "mass_per_m_kg": truss.cable_load_kg_m,
+                "evidence": "RigCalc calculation scope setting",
+            })
     for attached in construction.point_loads:
         item, attachment = attached.item, attached.attachment
         if item.weight_kg is not None and attachment.global_station_mm is not None:

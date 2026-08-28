@@ -12,7 +12,8 @@ def _point_with_z(point, z):
     return Point3D(point.x, point.y, z)
 
 
-def _parse_truss(vs, handle, object_id, fields):
+def _parse_truss(vs, handle, object_id, fields, cable_load_kg_m=0.0,
+                 safety_factor=1.0):
     location = symbol_location(vs, handle)
     if location is None:
         return None
@@ -49,7 +50,9 @@ def _parse_truss(vs, handle, object_id, fields):
         corner_type=fields.get("CornerType", ""), vw_truss_system=fields.get("TrussSystem", ""),
         width_mm=safe_float(fields.get("Width"), 0.0),
         height_mm=safe_float(fields.get("Height"), 0.0),
-        self_weight_kg=safe_float(fields.get("Weight"), 0.0) / 1000.0,
+        self_weight_kg=(safe_float(fields.get("Weight"), 0.0) /
+                        1000.0 * safety_factor),
+        cable_load_kg_m=max(0.0, cable_load_kg_m) * safety_factor,
         cross_section_id=fields.get("CrossSection", ""),
         vw_truss_line=fields.get("TrussSystemLineIdent", ""),
         vw_connections={name: fields.get(field, "") for name, field in (
@@ -60,7 +63,7 @@ def _parse_truss(vs, handle, object_id, fields):
     )
 
 
-def _parse_support(vs, handle, object_id, fields):
+def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
     location = symbol_location(vs, handle)
     if location is None:
         return None
@@ -91,7 +94,8 @@ def _parse_support(vs, handle, object_id, fields):
         hoist_id=fields.get("HoistID", ""), position=position,
         capacity_raw=fields.get("Capacity", ""), vw_truss_system=fields.get("TrussSysBottom", ""),
         vw_truss_system_top=fields.get("TrussSysTop", ""),
-        weight_with_chain_kg=safe_float(fields.get("WeightWithChain"), 0.0) / 1000.0,
+        weight_with_chain_kg=(safe_float(
+            fields.get("WeightWithChain"), 0.0) / 1000.0 * safety_factor),
         capacity_kg=safe_float(fields.get("Capacity"), 0.0) / 1000.0,
         object_position=Point3D(location.x, location.y, center_z(vs, handle)),
         geometry_fields=geometry_fields,
@@ -99,7 +103,7 @@ def _parse_support(vs, handle, object_id, fields):
     )
 
 
-def _parse_dead_hang(vs, handle, object_id, fields):
+def _parse_dead_hang(vs, handle, object_id, fields, safety_factor=1.0):
     """Convert a one-leg DeadHang Drop into a tension-only support link.
 
     Vectorworks stores the lower load point at ApexHeight - DropLength and
@@ -131,7 +135,8 @@ def _parse_dead_hang(vs, handle, object_id, fields):
         capacity_raw=fields.get("ForceDownLegMax", ""),
         vw_truss_system_top=fields.get("HouseRiggingPoint1", ""),
         weight_with_chain_kg=(
-            safe_float(fields.get("TotalWeight"), 0.0) / 1000.0),
+            safe_float(fields.get("TotalWeight"), 0.0) /
+            1000.0 * safety_factor),
         capacity_kg=(
             safe_float(fields.get("ForceDownLegMax"), 0.0) / 9.80665),
         is_structural_link=True,
@@ -149,10 +154,19 @@ def _parse_load(vs, handle, object_id, record_name, fields):
     location = symbol_location(vs, handle)
     if location is None:
         return None
+    if record_name == "Soft Goods":
+        # The generic object Z is the curtain geometry centre, not its
+        # suspension line. Loads must attach at the top trim.
+        attachment_z = safe_float(
+            fields.get("TopTrim", fields.get("Top Trim")),
+            center_z(vs, handle))
+    else:
+        attachment_z = safe_float(
+            fields.get("Z Location"), center_z(vs, handle))
     position = Point3D(
         safe_float(fields.get("X Location"), location.x),
         safe_float(fields.get("Y Location"), location.y),
-        safe_float(fields.get("Z Location"), center_z(vs, handle)),
+        attachment_z,
     )
     weight_raw = next((fields[name] for name in (
         "Weight", "Total Weight", "Load", "WeightDouble") if name in fields), None)
@@ -166,7 +180,8 @@ def _parse_load(vs, handle, object_id, record_name, fields):
     )
 
 
-def _parse_normalized_loads(vs, handle, object_id, record_name, fields):
+def _parse_normalized_loads(vs, handle, object_id, record_name, fields,
+                            safety_factor=1.0):
     base = _parse_load(vs, handle, object_id, record_name, fields)
     if base is None:
         return [], []
@@ -181,7 +196,8 @@ def _parse_normalized_loads(vs, handle, object_id, record_name, fields):
                     base.name,
                     " - " + component["label"] if len(components) > 1 else ""),
                 position=base.position, weight_raw=component.get("source_value"),
-                weight_kg=component["mass_kg"], raw_fields=fields,
+                weight_kg=component["mass_kg"] * safety_factor,
+                raw_fields=fields,
                 source_ref=handle,
             ))
         elif component["kind"] == "distributed":
@@ -206,8 +222,12 @@ def _parse_normalized_loads(vs, handle, object_id, record_name, fields):
             distributed.append(DistributedLoad(
                 id=object_id, name=base.name, position=base.position,
                 record_type=record_name,
-                total_mass_kg=component.get("mass_kg"),
-                mass_per_m_kg=component.get("mass_per_m_kg"),
+                total_mass_kg=(component.get("mass_kg") * safety_factor
+                               if component.get("mass_kg") is not None
+                               else None),
+                mass_per_m_kg=(component.get("mass_per_m_kg") * safety_factor
+                               if component.get("mass_per_m_kg") is not None
+                               else None),
                 length_mm=length_mm, end_position=end_position, raw_fields=fields,
                 source_ref=handle,
             ))
@@ -250,37 +270,44 @@ def _object_layer_name(vs, handle):
         return ""
 
 
-def scan_document(vs_module=None, included_layers=None, progress=None):
+def scan_document(vs_module=None, included_layers=None, progress=None,
+                  cable_load_kg_m=0.0, safety_factor=1.0):
     if vs_module is None:
         import vs as vs_module
     handles = []
     vs_module.ForEachObject(handles.append, "((T=86))")
     if progress:
-        progress("start", len(handles), "Bygger modell 0/{}".format(len(handles)))
+        progress("start", len(handles), "Scanning model 0/{}".format(len(handles)))
     document = DocumentModel()
     for counter, handle in enumerate(handles, 1):
         if included_layers is not None and _object_layer_name(vs_module, handle) not in included_layers:
             if progress:
-                progress("update", counter, "Bygger modell {}/{}".format(
+                progress("update", counter, "Scanning model {}/{}".format(
                     counter, len(handles)))
             continue
         record_name, fields = get_parametric_info(vs_module, handle)
         if not record_name:
             if progress:
-                progress("update", counter, "Bygger modell {}/{}".format(
+                progress("update", counter, "Scanning model {}/{}".format(
                     counter, len(handles)))
             continue
         if record_name == "TrussItem":
-            item = _parse_truss(vs_module, handle, "T{:03d}".format(counter), fields)
+            item = _parse_truss(
+                vs_module, handle, "T{:03d}".format(counter), fields,
+                cable_load_kg_m=cable_load_kg_m,
+                safety_factor=safety_factor)
             if item:
                 document.trusses.append(item)
         elif record_name == "BrxHoist":
-            item = _parse_support(vs_module, handle, "H{:03d}".format(counter), fields)
+            item = _parse_support(
+                vs_module, handle, "H{:03d}".format(counter), fields,
+                safety_factor=safety_factor)
             if item:
                 document.supports.append(item)
         elif record_name == "BridleObj":
             item = _parse_dead_hang(
-                vs_module, handle, "D{:03d}".format(counter), fields)
+                vs_module, handle, "D{:03d}".format(counter), fields,
+                safety_factor=safety_factor)
             if item:
                 document.supports.append(item)
             else:
@@ -297,14 +324,15 @@ def scan_document(vs_module=None, included_layers=None, progress=None):
                 ))
         else:
             points, distributed = _parse_normalized_loads(
-                vs_module, handle, "L{:03d}".format(counter), record_name, fields)
+                vs_module, handle, "L{:03d}".format(counter), record_name,
+                fields, safety_factor=safety_factor)
             if points or distributed:
                 document.point_loads.extend(points)
                 document.distributed_loads.extend(distributed)
             else:
                 document.ignored_record_types.append(record_name)
         if progress:
-            progress("update", counter, "Bygger modell {}/{}".format(
+            progress("update", counter, "Scanning model {}/{}".format(
                 counter, len(handles)))
     _suppress_speaker_array_members(document)
     return document

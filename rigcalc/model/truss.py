@@ -22,6 +22,7 @@ class TrussSegment:
     width_mm: float = 0.0
     height_mm: float = 0.0
     self_weight_kg: float = 0.0
+    cable_load_kg_m: float = 0.0
     cross_section_id: str = ""
     mechanical_section: Optional[MechanicalSection] = None
     cross_section_issues: list = field(default_factory=list)

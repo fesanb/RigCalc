@@ -23,10 +23,10 @@ def build_run_summary(document, constructions, primary, writeback,
     unassigned_dead_hangs = [item for item in document.unassigned_supports
                              if item.support_kind == "dead_hang"]
     unassigned = {
-        "motorer": len(unassigned_hoists),
+        "hoists": len(unassigned_hoists),
         "dead_hangs": len(unassigned_dead_hangs),
-        "punktlaster": len(document.unassigned_point_loads),
-        "fordelte_laster": len(document.unassigned_distributed_loads),
+        "point_loads": len(document.unassigned_point_loads),
+        "distributed_loads": len(document.unassigned_distributed_loads),
     }
     ignored = {}
     for record_name in document.ignored_record_types:
@@ -111,38 +111,43 @@ def make_run_summary_text(summary):
     ignored = summary["ignored_irrelevant_plugin_objects"]
     hoist_ids = summary.get("hoist_ids", {})
     notifications = summary.get("notifications", {})
+    status = "REVIEW REQUIRED" if (
+        errors["count"] or uncalculated.get("count", 0) or
+        unhandled["count"] or notifications.get("load_errors", 0) or
+        notifications.get("internal_errors", 0)) else "COMPLETE"
     return (
-        "RigCalc er ferdig.\n\n"
-        "FUNNET\n"
-        "Konstruksjoner: {}\n"
-        "Truss: {}\n"
-        "Motorer: {}\n"
-        "Nye HoistID: {}\n"
-        "DeadHangs: {}\n"
-        "Punktlaster: {}\n"
-        "Fordelte laster: {}\n"
-        "Trusskryss: {}\n\n"
-        "BEREGNET\n"
-        "Konstruksjoner: {}/{}\n"
-        "Lineære: {}\n"
-        "Korotasjonelle: {}\n"
-        "Motorer skrevet: {}\n"
-        "Trusskryss skrevet: {}\n"
-        "Frigitte motorstøtter: {}\n\n"
-        "KONTROLL\n"
-        "Lastfeil: {}\n"
-        "Defleksjonsmarkører: {}\n"
-        "Interne kraftfeil: {}\n"
-        "Tekniske feil: {}\n"
-        "Konstruksjoner uten beregning: {}\n"
-        "Ubehandlede objekter: {}\n"
-        "  Motorer: {}\n"
-        "  DeadHangs: {}\n"
-        "  Punktlaster: {}\n"
-        "  Fordelte laster: {}\n"
-        "Andre PIO-er ignorert: {}"
+        "RIGCALC  /  RUN SUMMARY\n"
+        "Status: {}\n\n"
+        "--- MODEL --------------------------------\n"
+        "Constructions: {}\n"
+        "Truss objects: {}\n"
+        "Hoists: {}\n"
+        "New Hoist IDs: {}\n"
+        "Dead hangs: {}\n"
+        "Point loads: {}\n"
+        "Distributed loads: {}\n"
+        "Truss Cross objects: {}\n\n"
+        "--- CALCULATION --------------------------\n"
+        "Calculated constructions: {}/{}\n"
+        "Linear primary results: {}\n"
+        "Corotational primary results: {}\n"
+        "Hoist results written: {}\n"
+        "Truss Cross results written: {}\n"
+        "Released hoist supports: {}\n\n"
+        "--- REVIEW -------------------------------\n"
+        "Load errors: {}\n"
+        "Deflection markers: {}\n"
+        "Internal-force errors: {}\n"
+        "Technical errors: {}\n"
+        "Uncalculated constructions: {}\n"
+        "Unhandled calculation objects: {}\n"
+        "  Hoists: {}\n"
+        "  Dead hangs: {}\n"
+        "  Point loads: {}\n"
+        "  Distributed loads: {}\n"
+        "Ignored irrelevant plug-in objects: {}"
     ).format(
-        found["constructions"], found["trusses"], found["motors"],
+        status, found["constructions"], found["trusses"], found["motors"],
         hoist_ids.get("assigned", 0),
         found["dead_hangs"],
         found["point_loads"], found["distributed_loads"],
@@ -155,7 +160,7 @@ def make_run_summary_text(summary):
         notifications.get("deflections", 0),
         notifications.get("internal_errors", 0), errors["count"],
         uncalculated.get("count", 0),
-        unhandled["count"], unhandled["motorer"],
+        unhandled["count"], unhandled["hoists"],
         unhandled["dead_hangs"],
-        unhandled["punktlaster"], unhandled["fordelte_laster"],
+        unhandled["point_loads"], unhandled["distributed_loads"],
         ignored["count"])

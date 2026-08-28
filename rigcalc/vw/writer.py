@@ -5,7 +5,7 @@ from rigcalc import config
 from rigcalc.normalization import normalize_inventory
 from rigcalc.notifications import evaluate_notifications
 from rigcalc.report import (build_run_summary, make_calculation_text,
-                            make_run_summary_text, make_text_report,
+                            make_text_report,
                             write_json_report)
 from rigcalc.solver import (calculate_corotational_reactions,
                             calculate_reactions, compare_calculations,
@@ -13,6 +13,7 @@ from rigcalc.solver import (calculate_corotational_reactions,
 from .hoist_writeback import write_high_hook_values
 from .notifications import write_notification_markers
 from .truss_cross_writeback import write_truss_cross_forces
+from .summary_dialog import show_run_summary_dialog
 
 
 def report_output_directory():
@@ -22,6 +23,8 @@ def report_output_directory():
 
 def write_reports(vs, document, constructions, inventory=None,
                   included_layers=None, progress=None,
+                  cable_load_kg_m=0.0,
+                  safety_factor=1.0,
                   hoist_id_assignment=None):
     output_dir = report_output_directory()
     os.makedirs(output_dir, exist_ok=True)
@@ -31,7 +34,7 @@ def write_reports(vs, document, constructions, inventory=None,
             "status": "not_run", "items": []}, stream,
             ensure_ascii=False, indent=2)
     if progress:
-        progress("start", 4, "Skriver modellrapporter 0/4")
+        progress("start", 4, "Writing model reports 0/4")
     text_path = os.path.join(output_dir, config.REPORT_BASENAME + ".txt")
     json_path = os.path.join(output_dir, config.REPORT_BASENAME + ".json")
     with open(text_path, "w", encoding="utf-8") as stream:
@@ -45,10 +48,12 @@ def write_reports(vs, document, constructions, inventory=None,
         "attachment_warning_distance_mm": config.ATTACHMENT_WARNING_DISTANCE_MM,
         "attachment_search_radius_mm": config.ATTACHMENT_SEARCH_RADIUS_MM,
         "included_layers": included_layers or [],
+        "cable_load_kg_m": cable_load_kg_m,
+        "safety_factor": safety_factor,
     }
     write_json_report(json_path, document, constructions, settings)
     if progress:
-        progress("update", 1, "Skriver modellrapporter 1/4")
+        progress("update", 1, "Writing model reports 1/4")
     normalized = {"summary": {
         "load_component_count": 0, "explicit_connection_count": 0}}
     if config.WRITE_DEVELOPMENT_INVENTORY:
@@ -100,13 +105,13 @@ def write_reports(vs, document, constructions, inventory=None,
         json.dump({"cross_sections": list(section_rows.values())}, stream,
                   ensure_ascii=False, indent=2)
     if progress:
-        progress("update", 4, "Modellrapporter ferdige 4/4")
+        progress("update", 4, "Model reports complete 4/4")
         progress("start", len(constructions),
-                 "Lineær analyse 0/{}".format(len(constructions)))
+                 "Linear analysis 0/{}".format(len(constructions)))
 
     def linear_progress(construction_id, completed, total):
         if progress:
-            progress("update", completed, "Lineær analyse {}/{}: {}".format(
+            progress("update", completed, "Linear analysis {}/{}: {}".format(
                 completed, total, construction_id))
 
     calculation = calculate_reactions(
@@ -119,7 +124,7 @@ def write_reports(vs, document, constructions, inventory=None,
         stream.write(make_calculation_text(calculation))
     if progress:
         progress("start", len(constructions),
-                 "Ikke-lineær analyse 0/{}".format(len(constructions)))
+                 "Nonlinear analysis 0/{}".format(len(constructions)))
     nonlinear_completed = set()
 
     def nonlinear_progress(construction_id, state):
@@ -128,19 +133,19 @@ def write_reports(vs, document, constructions, inventory=None,
         if state.get("completed"):
             nonlinear_completed.add(construction_id)
             progress("update", len(nonlinear_completed),
-                     "Ikke-lineær analyse {}/{}: {} ferdig".format(
+                     "Nonlinear analysis {}/{}: {} complete".format(
                          len(nonlinear_completed), len(constructions),
                          construction_id))
         else:
             progress("pulse", message=(
-                "{}: last {:.1f} %, iterasjon {}".format(
+                "{}: load {:.1f}%, iteration {}".format(
                     construction_id, 100.0*state["load_factor"],
                     state["iteration"])))
 
     nonlinear = calculate_corotational_reactions(
         document, constructions, progress=nonlinear_progress)
     if progress:
-        progress("start", 4, "Skriver resultater 0/4")
+        progress("start", 4, "Writing results 0/4")
     nonlinear_json_path = os.path.join(
         output_dir, "rigcalc_nonlinear_calculation.json")
     nonlinear_text_path = os.path.join(
@@ -175,14 +180,14 @@ def write_reports(vs, document, constructions, inventory=None,
         json.dump(notification_writeback, stream,
                   ensure_ascii=False, indent=2)
     if progress:
-        progress("update", 2, "Rapporter skrevet 2/4")
+        progress("update", 2, "Reports written 2/4")
     writeback = write_high_hook_values(
         vs, document, primary, confirm=False)
     writeback_path = os.path.join(output_dir, "rigcalc_writeback.json")
     with open(writeback_path, "w", encoding="utf-8") as stream:
         json.dump(writeback, stream, ensure_ascii=False, indent=2)
     if progress:
-        progress("update", 3, "High Hook-felt skrevet 3/4")
+        progress("update", 3, "High Hook fields written 3/4")
     cross_writeback = write_truss_cross_forces(
         vs, document, primary, confirm=False)
     cross_writeback_path = os.path.join(
@@ -190,7 +195,7 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(cross_writeback_path, "w", encoding="utf-8") as stream:
         json.dump(cross_writeback, stream, ensure_ascii=False, indent=2)
     if progress:
-        progress("update", 4, "Ferdig 4/4")
+        progress("update", 4, "Complete 4/4")
         progress("close")
     summary = build_run_summary(
         document, constructions, primary, writeback, cross_writeback,
@@ -199,5 +204,5 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(os.path.join(output_dir, "rigcalc_run_summary.json"),
               "w", encoding="utf-8") as stream:
         json.dump(summary, stream, ensure_ascii=False, indent=2)
-    vs.AlrtDialog(make_run_summary_text(summary))
+    show_run_summary_dialog(vs, summary)
     return text_path, json_path

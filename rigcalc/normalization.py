@@ -137,8 +137,29 @@ def load_components(record_name, fields):
         item = _kg_component(fields, "array total weight", kg_fields=("TotalWeightKG",), display_fields=("TotalWeight",))
         return [item] if item else []
     if record_name == "Soft Goods":
-        item = _kg_component(fields, "soft goods total weight", kg_fields=("WeightKG",), display_fields=("Weight",))
-        return [item] if item else []
+        total_name, total_raw = _value(fields, ("WeightKG",))
+        rate_name, rate_raw = _value(fields, ("DistWeightKG",))
+        length_name, length_raw = _value(
+            fields, ("AdjustableLength", "TTLSGLngthNum"))
+        total, rate, length = map(
+            parse_number, (total_raw, rate_raw, length_raw))
+        if total is None:
+            return []
+        return [{
+            "label": "soft goods distributed weight",
+            "kind": "distributed",
+            "mass_kg": total,
+            "mass_per_m_kg": rate,
+            "length_mm": length,
+            "source_fields": {
+                "mass_kg": total_name, "mass_per_m_kg": rate_name,
+                "length_mm": length_name,
+            },
+            "source_values": {
+                "mass_kg": total_raw, "mass_per_m_kg": rate_raw,
+                "length_mm": length_raw,
+            },
+        }]
     if record_name == "Video Screen":
         screen = _kg_component(fields, "screen", kg_fields=("ScrnWeightKG",), display_fields=("ScrnWeightStr",))
         projector = _kg_component(fields, "projector", kg_fields=("ProjWeightKG",), display_fields=("ProjWeightStr",))

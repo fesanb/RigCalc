@@ -25,20 +25,20 @@ class ProgressTests(unittest.TestCase):
         vs = FakeVS()
         progress = VWProgress(vs)
         progress.begin_workflow(2)
-        progress.start(2, "Modell 0/2")
-        progress.update(2, "Modell 2/2")
+        progress.start(2, "Model 0/2")
+        progress.update(2, "Model 2/2")
         progress.start(1, "Solver 0/1")
-        self.assertTrue(any("ferdig: Modell" in item for item in vs.messages))
-        self.assertTrue(any("kjører: Solver" in item for item in vs.messages))
+        self.assertTrue(any("[DONE] Model" in item for item in vs.messages))
+        self.assertTrue(any("[RUN ] Solver" in item for item in vs.messages))
 
     def test_cancel_is_raised_at_next_yield(self):
         vs = FakeVS()
         progress = VWProgress(vs)
         progress.begin_workflow(1)
-        progress.start(2, "Modell 0/2")
+        progress.start(2, "Model 0/2")
         vs.cancelled = True
         with self.assertRaises(RigCalcCancelled):
-            progress.update(1, "Modell 1/2")
+            progress.update(1, "Model 1/2")
 
 
 if __name__ == "__main__":

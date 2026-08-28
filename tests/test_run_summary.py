@@ -24,8 +24,9 @@ class RunSummaryTests(unittest.TestCase):
         self.assertEqual(
             summary["ignored_irrelevant_plugin_objects"]["count"], 1)
         text = make_run_summary_text(summary)
-        self.assertIn("Tekniske feil: 0", text)
-        self.assertIn("Ubehandlede objekter: 1", text)
+        self.assertIn("Technical errors: 0", text)
+        self.assertIn("Unhandled calculation objects: 1", text)
+        self.assertIn("Status: REVIEW REQUIRED", text)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,22 @@ class CalculationTests(unittest.TestCase):
         self.assertAlmostEqual(
             result["reactions"][0]["preliminary_high_hook_mass_kg"], 135)
 
+    def test_configured_cable_rate_is_applied_over_each_truss_length(self):
+        start, end = Point3D(0, 0), Point3D(10000, 0)
+        truss = TrussSegment(
+            "T1", "Truss", "Line", start, 10000, start, end,
+            cable_load_kg_m=2.0)
+        document = DocumentModel(
+            trusses=[truss],
+            supports=[Support("H1", "", start), Support("H2", "", end)])
+        result = calculate_reactions(
+            document, build_constructions(document))["constructions"][0]
+        cable = next(item for item in result["loads"]
+                     if item["source_type"] == "cable_flat_rate")
+        self.assertAlmostEqual(cable["mass_kg"], 20.0)
+        self.assertAlmostEqual(cable["mass_per_m_kg"], 2.0)
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 20.0)
+
     def test_multi_support_solver_requires_mechanical_section(self):
         start, end = Point3D(0, 0), Point3D(10000, 0)
         truss = TrussSegment(
