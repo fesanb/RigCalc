@@ -108,6 +108,16 @@ class NotificationEvaluationTests(unittest.TestCase):
         self.assertTrue(all("diagnostic only" in item["message"]
                             for item in items))
 
+    def test_contact_model_pending_validation_is_marked(self):
+        value = calculation(reaction(120, 250, "H1"))
+        value["constructions"][0].update({
+            "writeback_eligible": False,
+            "issues": [
+                "tension_only_contact_model_diagnostic_not_writeback_source"],
+        })
+        item = evaluate_support_model_failures(value)[0]
+        self.assertIn("physical validation pending", item["message"])
+
 
 class FakeVS:
     def __init__(self):

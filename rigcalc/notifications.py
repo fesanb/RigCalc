@@ -189,8 +189,15 @@ def evaluate_support_model_failures(calculation):
                     construction_id, hoist_id or "support"),
             })
             continue
-        if "tension_only_contact_mass_model_not_implemented" not in issues:
+        contact_model_issues = {
+            "tension_only_contact_mass_model_not_implemented",
+            "tension_only_contact_model_diagnostic_not_writeback_source",
+        }
+        if not contact_model_issues.intersection(issues):
             continue
+        detail = ("physical validation pending" if
+                  "tension_only_contact_model_diagnostic_not_writeback_source"
+                  in issues else "slack / mass model")
         for reaction in construction.get("reactions", []):
             if (reaction.get("is_structural_link") or
                     reaction.get("support_kind") != "hoist"):
@@ -204,8 +211,8 @@ def evaluate_support_model_failures(calculation):
                 "class_name": LOAD_NOTIFICATION_CLASS,
                 "construction_id": construction_id,
                 "support_id": support_id,
-                "message": "CONTACT MODEL\n{}: diagnostic only\nNo writeback: slack / mass model".format(
-                    hoist_id),
+                "message": "CONTACT MODEL\n{}: diagnostic only\nNo writeback: {}".format(
+                    hoist_id, detail),
             })
     return notifications
 

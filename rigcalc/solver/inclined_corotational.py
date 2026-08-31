@@ -14,6 +14,7 @@ from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
                               _section_result)
 from .corotational import (CorotationalElement, CorotationalModel,
                            CorotationalNode, solve_corotational)
+from .contact import contact_mass_by_support, engaged_contact_mass_loads
 from .deflection import build_deflection_summary, support_span_midpoints
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
 
@@ -71,28 +72,6 @@ def _node_loads(stations, nodes, loads):
         loads_by_station[index][2] += -q_transverse*length**2/12.0
         loads_by_station[index+1][2] += q_transverse*length**2/12.0
     return loads_by_station
-
-
-def _contact_mass_loads(hoists):
-    """Represent engaged hoist/chain mass at each active truss contact.
-
-    This is intentionally a load-model input rather than a writeback value.
-    A candidate state includes the mass only while its chain is engaged.
-    """
-    result = []
-    for attached in hoists:
-        mass = attached.item.weight_with_chain_kg
-        station = attached.attachment.global_station_mm
-        if mass <= 0.0 or station is None:
-            continue
-        result.append({
-            "source_id": "{}:contact_mass".format(attached.item.id),
-            "source_type": "hoist_chain_contact_mass",
-            "mass_kg": mass,
-            "station_mm": station,
-            "evidence": "BrxHoist.WeightWithChain; engaged_contact_state",
-        })
-    return result
 
 
 def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
@@ -176,12 +155,9 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                      <= STATION_TOLERANCE_MM)
         result["reactions"].append(_reaction_record(
             support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
-    contact_mass_by_support = {
-        item["source_id"].split(":", 1)[0]: item["mass_kg"]
-        for item in loads if item.get("source_type") ==
-        "hoist_chain_contact_mass"}
+    contact_masses = contact_mass_by_support(loads)
     for reaction in result["reactions"]:
-        mass = contact_mass_by_support.get(reaction["support_id"], 0.0)
+        mass = contact_masses.get(reaction["support_id"], 0.0)
         if mass:
             reaction["contact_mass_included_kg"] = mass
             # The reaction already includes this contact load. It must never
@@ -203,7 +179,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                                    if item.item.is_structural_link})
                     if len(active_ids) < 2:
                         continue
-                    candidate_loads = list(loads) + _contact_mass_loads(
+                    candidate_loads = list(loads) + engaged_contact_mass_loads(
                         selected)
                     candidate = solve_inclined_corotational_beam(
                         construction, candidate_loads, active_ids,

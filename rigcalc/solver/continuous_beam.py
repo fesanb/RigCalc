@@ -12,6 +12,7 @@ This remains a first-order vertical model, not the later geometric model.
 from itertools import combinations
 
 from .beam_statics import _reaction_record, planar_beam_geometry_issue
+from .contact import contact_mass_by_support, engaged_contact_mass_loads
 from .deflection import (build_deflection_summary,
                          support_span_midpoints)
 from .frame3d import FrameElement, FrameModel, FrameNode, solve_frame
@@ -89,9 +90,11 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
             active_ids = structural_ids | {item.item.id for item in active_hoists}
             if len(active_ids) < 2:
                 continue
+            candidate_loads = list(loads) + engaged_contact_mass_loads(
+                active_hoists)
             evaluated += 1
             candidate = solve_continuous_beam(
-                construction, loads, _active_support_ids=active_ids,
+                construction, candidate_loads, _active_support_ids=active_ids,
                 _signed_reactions=signed_reactions,
                 _resolve_tension_only=False)
             if candidate["status"] != "preliminary":
@@ -309,6 +312,15 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         reaction["unconstrained_reaction_mass_kg"] = (
             signed["reaction_mass_kg"] if signed else None)
         result["reactions"].append(reaction)
+    contact_masses = contact_mass_by_support(loads)
+    for reaction in result["reactions"]:
+        mass = contact_masses.get(reaction["support_id"], 0.0)
+        if mass:
+            reaction["contact_mass_included_kg"] = mass
+            reaction["preliminary_high_hook_mass_kg"] = (
+                reaction["reaction_mass_kg"])
+            reaction["high_hook_mass_basis"] = (
+                "reaction_includes_engaged_contact_mass_diagnostic")
     result["signed_reactions"] = _signed_reactions
     reaction_total = sum(
         item["reaction_mass_kg"] for item in result["reactions"])
@@ -371,20 +383,25 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
             "method": "all_active_hoists_nonnegative",
             "candidate_sets_evaluated": 1,
         }
-    contact_mass_model_missing = any(
+    has_hoist_support = any(
         not item["is_structural_link"] for item in result["reactions"])
+    contact_mass_model_missing = has_hoist_support and not contact_masses
     if contact_mass_model_missing:
         # A fixed-point active set preserves a valuable signed diagnostic, but
         # it is not the physical cable-contact solution until slack,
         # re-engagement and hoist/chain mass are represented at contact.
         result["issues"].append(
             "tension_only_contact_mass_model_not_implemented")
+    elif has_hoist_support:
+        result["issues"].append(
+            "tension_only_contact_model_diagnostic_not_writeback_source")
     finalize_eligibility(
         result, support_model_valid=(not negative_hoists and
                                      active_set_issue is None and
                                      not contact_mass_model_missing),
         numerical_valid=(result["numerical_diagnostics"]
-                         ["relative_reduced_residual"] <= 1.0e-8))
+                         ["relative_reduced_residual"] <= 1.0e-8),
+        permit_writeback=not has_hoist_support)
     released_count = sum(
         not item["support_active"] for item in result["reactions"])
     if released_count:

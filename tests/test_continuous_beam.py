@@ -140,6 +140,24 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
 
+    def test_engaged_level_contact_state_includes_hoist_chain_mass(self):
+        item = construction(10000, [0, 10000], total_mass_kg=100)
+        item.supports[0].item.weight_with_chain_kg = 10.0
+        item.supports[1].item.weight_with_chain_kg = 20.0
+        result = solve(item)
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+                               places=6)
+        self.assertAlmostEqual(sum(item["reaction_mass_kg"]
+                                   for item in result["reactions"]), 130.0,
+                               places=6)
+        self.assertTrue(result["validation"]["support_model_valid"])
+        self.assertFalse(result["writeback_eligible"])
+        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
+                         10.0)
+        self.assertIn(
+            "tension_only_contact_model_diagnostic_not_writeback_source",
+            result["issues"])
+
     def test_extreme_support_spacing_remains_numerically_auditable(self):
         result = solve(construction(
             20000, [0, 25, 20000], total_mass_kg=200,
