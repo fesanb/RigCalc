@@ -303,6 +303,28 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
 
+    def test_inclined_frame_contact_state_includes_engaged_hoist_chain_mass(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        item.supports[0].item.weight_with_chain_kg = 10.0
+        item.supports[1].item.weight_with_chain_kg = 20.0
+        result = solve_inclined_planar_frame(
+            item, trace_construction_loads(item))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertFalse(result["writeback_eligible"])
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+                               places=4)
+        self.assertAlmostEqual(sum(value["reaction_mass_kg"]
+                                   for value in result["reactions"]), 130.0,
+                               places=4)
+        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
+                         10.0)
+        self.assertEqual(result["reactions"][1]["contact_mass_included_kg"],
+                         20.0)
+        self.assertIn(
+            "tension_only_contact_model_diagnostic_not_writeback_source",
+            result["issues"])
+
     def test_uniform_load_equilibrium_and_support_deflection_for_2_to_20_supports(self):
         length_mm = 19000.0
         for support_count in range(2, 21):

@@ -6,6 +6,7 @@ from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
 from .frame3d import (FrameElement, FrameModel, FrameNode, element_axes,
                       global_uniform_load_to_local, solve_frame)
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
+from .contact import contact_mass_by_support, engaged_contact_mass_loads
 from math import sqrt
 from itertools import combinations
 from .deflection import build_deflection_summary, support_span_midpoints
@@ -72,6 +73,16 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
     for support in supports:
         node = next(node for node, station in zip(nodes, stations) if abs(station-support.attachment.global_station_mm) <= STATION_TOLERANCE_MM)
         result["reactions"].append(_reaction_record(support, solved["node_reactions"][node.id][2]/GRAVITY_M_S2))
+    contact_masses = contact_mass_by_support(loads)
+    for reaction in result["reactions"]:
+        mass = contact_masses.get(reaction["support_id"], 0.0)
+        if mass:
+            reaction["contact_mass_included_kg"] = mass
+            # This reaction already includes the contact load, so it cannot
+            # also receive the chain mass through the ordinary High Hook path.
+            reaction["preliminary_high_hook_mass_kg"] = reaction["reaction_mass_kg"]
+            reaction["high_hook_mass_basis"] = (
+                "reaction_includes_engaged_contact_mass_diagnostic")
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
     if _active_ids is None:
@@ -82,7 +93,8 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
                 for chosen in combinations(hoists, size):
                     ids = {item.item.id for item in chosen} | {item.item.id for item in all_supports if item.item.is_structural_link}
                     if len(ids) < 2: continue
-                    candidate = solve_inclined_planar_frame(construction, loads, ids, _signed_reactions)
+                    candidate_loads = list(loads) + engaged_contact_mass_loads(chosen)
+                    candidate = solve_inclined_planar_frame(construction, candidate_loads, ids, _signed_reactions)
                     if candidate["status"] != "diagnostic" or any(r["reaction_mass_kg"] < -1e-6 for r in candidate["reactions"]): continue
                     displacement = {round(item["station_mm"], 6): item["displacements"]["uz_m"] for item in candidate["stations"]}
                     if any(displacement[round(item.attachment.global_station_mm, 6)] > 1e-8 for item in hoists if item.item.id not in ids): continue
@@ -144,4 +156,9 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
         result["stations"], support_stations)
     result["status"] = "diagnostic"
     result["issues"].append("inclined_geometry_diagnostic_not_writeback_source")
+    if contact_masses:
+        result["issues"].append(
+            "tension_only_contact_model_diagnostic_not_writeback_source")
+    else:
+        result["issues"].append("tension_only_contact_mass_model_not_implemented")
     return result
