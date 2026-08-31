@@ -66,6 +66,8 @@ class TrussCrossWritebackTests(unittest.TestCase):
                 "reaction_mass_kg"] = mass
             result = write_truss_cross_forces(vs, self.document(), calculation)
             self.assertEqual(result["status"], "nothing_to_write")
+            self.assertEqual(result["items"][0]["status"],
+                             "skipped_invalid_reaction_mass")
             self.assertEqual(vs.fields["Force"], "0")
 
 

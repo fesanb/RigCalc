@@ -12,7 +12,7 @@ FORCE_FIELD = "Force"
 
 def _write_candidates(document, calculation):
     links = {item.id: item for item in document.structural_links}
-    result = []
+    result, skipped = [], []
     for construction in calculation["constructions"]:
         if (construction["status"] != "preliminary" or
                 not construction.get("writeback_eligible", False)):
@@ -25,19 +25,24 @@ def _write_candidates(document, calculation):
                 continue
             mass_kg = reaction.get("reaction_mass_kg")
             if not isinstance(mass_kg, (int, float)) or not isfinite(mass_kg):
+                skipped.append({
+                    "link_id": link.id,
+                    "construction_id": construction["construction_id"],
+                    "status": "skipped_invalid_reaction_mass",
+                })
                 continue
             result.append({
                 "construction_id": construction["construction_id"],
                 "link": link,
                 "force_n": mass_kg * STANDARD_GRAVITY_M_S2,
             })
-    return result
+    return result, skipped
 
 
 def write_truss_cross_forces(vs, document, calculation, confirm=True):
-    candidates = _write_candidates(document, calculation)
+    candidates, skipped = _write_candidates(document, calculation)
     if not candidates:
-        return {"status": "nothing_to_write", "items": []}
+        return {"status": "nothing_to_write", "items": skipped}
     preview = ["{}: {:+.2f} N".format(
         item["link"].name or item["link"].id, item["force_n"])
         for item in candidates]
@@ -47,7 +52,7 @@ def write_truss_cross_forces(vs, document, calculation, confirm=True):
             "{}\n\nContinue?".format("\n".join(preview))):
         return {"status": "cancelled", "items": []}
     vs.NameUndoEvent("RigCalc truss-cross force writeback")
-    results = []
+    results = list(skipped)
     for candidate in candidates:
         link, force_n = candidate["link"], candidate["force_n"]
         record_name, old_fields = get_parametric_info(vs, link.source_ref)

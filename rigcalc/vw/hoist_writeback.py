@@ -9,7 +9,7 @@ from .records import get_parametric_info, safe_float
 
 def _write_candidates(document, calculation):
     supports = {item.id: item for item in document.supports}
-    candidates = []
+    candidates, skipped = [], []
     for construction in calculation["constructions"]:
         if (construction["status"] != "preliminary" or
                 not construction.get("writeback_eligible", False)):
@@ -23,19 +23,24 @@ def _write_candidates(document, calculation):
             mass_kg = reaction.get("preliminary_high_hook_mass_kg")
             if (not isinstance(mass_kg, (int, float)) or
                     not isfinite(mass_kg) or mass_kg < 0.0):
+                skipped.append({
+                    "support_id": support.id, "hoist_id": support.hoist_id,
+                    "construction_id": construction["construction_id"],
+                    "status": "skipped_invalid_high_hook_mass",
+                })
                 continue
             candidates.append({
                 "construction_id": construction["construction_id"],
                 "support": support,
                 "mass_kg": mass_kg,
             })
-    return candidates
+    return candidates, skipped
 
 
 def write_high_hook_values(vs, document, calculation, confirm=True):
-    candidates = _write_candidates(document, calculation)
+    candidates, skipped = _write_candidates(document, calculation)
     if not candidates:
-        return {"status": "nothing_to_write", "items": []}
+        return {"status": "nothing_to_write", "items": skipped}
 
     preview = []
     for item in candidates:
@@ -50,7 +55,7 @@ def write_high_hook_values(vs, document, calculation, confirm=True):
         return {"status": "cancelled", "items": []}
 
     vs.NameUndoEvent("RigCalc High Hook writeback")
-    results = []
+    results = list(skipped)
     for candidate in candidates:
         support = candidate["support"]
         handle = support.source_ref

@@ -91,6 +91,8 @@ class HoistWritebackTests(unittest.TestCase):
                 Support("H1", "Hoist", Point3D(0, 0), source_ref="handle")]),
                 calculation)
             self.assertEqual(result["status"], "nothing_to_write")
+            self.assertEqual(result["items"][0]["status"],
+                             "skipped_invalid_high_hook_mass")
             self.assertEqual(vs.fields["ReactionForceWeight"], "0")
 
 
