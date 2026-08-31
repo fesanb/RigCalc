@@ -38,6 +38,15 @@ def make_calculation_text(data):
                     "yes" if validation.get("support_model_valid") else "no",
                     "yes" if validation.get("numerically_valid") else "no",
                     "yes" if validation.get("load_model_valid") else "no"))
+        numerical = item.get("numerical_diagnostics", {})
+        if numerical:
+            lines.append(
+                "Numerical diagnostics: method={} min scaled pivot={:.3e} "
+                "relative residual={:.3e} refinements={}".format(
+                    numerical.get("method", "-"),
+                    numerical.get("minimum_scaled_pivot", 0.0),
+                    numerical.get("relative_reduced_residual", 0.0),
+                    numerical.get("iterative_refinement_steps", 0)))
         for reaction in item["reactions"]:
             support_state = (
                 " [released tension-only support]"

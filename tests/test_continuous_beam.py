@@ -320,6 +320,8 @@ class ContinuousBeamTests(unittest.TestCase):
             "two_active_support_static_equilibrium")
         report = make_calculation_text({"constructions": [result]})
         self.assertIn("Validation: equilibrium=yes support model=yes", report)
+        self.assertIn("Numerical diagnostics: method=scaled_partial_pivoting",
+                      report)
         self.assertIn("unconstrained signed reaction", report)
 
     def test_unproven_tension_only_set_is_diagnostic_and_writeback_blocked(self):
