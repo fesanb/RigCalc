@@ -53,6 +53,15 @@ class RunSummaryTests(unittest.TestCase):
         self.assertEqual(summary["diagnostic"]["inclined_planar_frames"], 1)
         self.assertEqual(summary["uncalculated_constructions"]["count"], 0)
 
+    def test_invalid_writeback_skip_is_a_visible_technical_error(self):
+        skipped = {"items": [{
+            "status": "skipped_invalid_high_hook_mass"}]}
+        summary = build_run_summary(
+            DocumentModel(), [], {"constructions": []}, skipped,
+            {"items": []})
+        self.assertEqual(summary["technical_errors"]["count"], 1)
+        self.assertIn("Status: REVIEW REQUIRED", make_run_summary_text(summary))
+
 
 if __name__ == "__main__":
     unittest.main()
