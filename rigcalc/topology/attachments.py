@@ -8,6 +8,9 @@ from rigcalc.model.hoist import Support
 from .geometry import point_to_segment, point_to_segment_2d
 
 
+ASSOCIATION_AMBIGUITY_TOLERANCE_MM = 1.0e-6
+
+
 def nearest_line_truss(position, trusses, plan_only=False):
     best = None
     for truss in trusses:
@@ -292,6 +295,21 @@ def _unassigned_support_diagnostic(support, constructions):
     return result
 
 
+def _competing_attachment_diagnostic(candidates):
+    """Preserve why geometrically tied carriers cannot be selected safely."""
+    rows = []
+    for clearance, axis_distance, construction_id, _, attached in candidates:
+        rows.append({
+            "construction_id": construction_id,
+            "truss_id": attached.attachment.truss_id,
+            "carrier_clearance_mm": clearance,
+            "axis_distance_mm": axis_distance,
+            "method": attached.attachment.method,
+        })
+    return {"reason": "ambiguous_geometry_attachment",
+            "competing_carriers": rows}
+
+
 def attach_document_objects(document, constructions):
     for attribute, objects in (
         ("supports", document.supports),
@@ -323,8 +341,24 @@ def attach_document_objects(document, constructions):
                         attached.attachment.distance_from_truss_axis_mm,
                         construction.id, construction, attached))
             if candidates:
-                _, _, _, construction, attached = min(
-                    candidates, key=lambda value: value[:3])
+                candidates.sort(key=lambda value: value[:3])
+                best = candidates[0]
+                tied = [item for item in candidates if
+                       abs(item[0]-best[0]) <= ASSOCIATION_AMBIGUITY_TOLERANCE_MM and
+                       abs(item[1]-best[1]) <= ASSOCIATION_AMBIGUITY_TOLERANCE_MM]
+                if len(tied) > 1:
+                    unassigned_attribute = "unassigned_" + attribute
+                    getattr(document, unassigned_attribute).append(item)
+                    diagnostic = _competing_attachment_diagnostic(tied)
+                    document.unassigned_attachment_diagnostics[item.id] = diagnostic
+                    if attribute == "supports":
+                        support_diagnostic = _unassigned_support_diagnostic(
+                            item, constructions)
+                        support_diagnostic.update(diagnostic)
+                        document.unassigned_support_diagnostics[item.id] = (
+                            support_diagnostic)
+                    continue
+                _, _, _, construction, attached = best
                 if attribute == "distributed_loads" and item.end_position:
                     endpoint = attach_item(
                         replace(item, position=item.end_position), construction,

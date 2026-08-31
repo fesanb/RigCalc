@@ -85,6 +85,21 @@ class AttachmentTests(unittest.TestCase):
         self.assertAlmostEqual(
             diagnostic["nearest_plan"]["carrier_clearance_mm"], 0.0)
 
+    def test_geometrically_tied_support_remains_unassigned_with_competing_evidence(self):
+        first = TrussSegment(
+            "T1", "", "Line", Point3D(0, 0), 3000,
+            Point3D(0, 0), Point3D(3000, 0))
+        second = TrussSegment(
+            "T2", "", "Line", Point3D(1500, -1500), 3000,
+            Point3D(1500, -1500), Point3D(1500, 1500))
+        support = Support("H1", "Hoist", Point3D(1500, 0))
+        document = DocumentModel(trusses=[first, second], supports=[support])
+        build_constructions(document)
+        self.assertEqual(document.unassigned_supports, [support])
+        diagnostic = document.unassigned_support_diagnostics["H1"]
+        self.assertEqual(diagnostic["reason"], "ambiguous_geometry_attachment")
+        self.assertEqual(len(diagnostic["competing_carriers"]), 2)
+
     def test_explicit_uuid_resolves_inclined_truss_with_plan_geometry(self):
         start = Point3D(0, 0, 1000)
         end = Point3D(3000, 0, 5000)
