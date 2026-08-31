@@ -226,6 +226,10 @@ gravity loads and vertical supports. Branched or looped topology, lateral
 loads, torsion, corner blocks, and arbitrary 3D load paths are reported as
 unsupported rather than analysed by the beam solver.
 
+The implementation roadmap for every in-scope geometry is maintained in
+[`docs/solver-roadmap.md`](docs/solver-roadmap.md). An unsupported result is a
+tracked implementation gap, never an accepted product-scope exclusion.
+
 The linear and corotational analyses are compared before a primary result is
 selected. The corotational solver is diagnostic-only until it implements the
 same tension-only hoist support model as the linear solver. Hoist supports that
