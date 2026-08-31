@@ -28,6 +28,7 @@ class HoistWritebackTests(unittest.TestCase):
     def calculation(self):
         return {"constructions": [{
             "construction_id": "C1", "status": "preliminary",
+            "writeback_eligible": True,
             "reactions": [{
                 "support_id": "H1", "preliminary_high_hook_mass_kg": 123.4,
                 "is_structural_link": False,
@@ -66,6 +67,16 @@ class HoistWritebackTests(unittest.TestCase):
             Support("H1", "Hoist", Point3D(0, 0), source_ref="handle")])
         calculation = self.calculation()
         calculation["constructions"][0]["writeback_eligible"] = False
+        result = write_high_hook_values(vs, document, calculation)
+        self.assertEqual(result["status"], "nothing_to_write")
+        self.assertEqual(vs.fields["ReactionForceWeight"], "0")
+
+    def test_missing_eligibility_flag_is_not_written(self):
+        vs = FakeVS()
+        document = DocumentModel(supports=[
+            Support("H1", "Hoist", Point3D(0, 0), source_ref="handle")])
+        calculation = self.calculation()
+        del calculation["constructions"][0]["writeback_eligible"]
         result = write_high_hook_values(vs, document, calculation)
         self.assertEqual(result["status"], "nothing_to_write")
         self.assertEqual(vs.fields["ReactionForceWeight"], "0")

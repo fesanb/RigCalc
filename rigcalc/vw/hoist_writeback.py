@@ -10,7 +10,7 @@ def _write_candidates(document, calculation):
     candidates = []
     for construction in calculation["constructions"]:
         if (construction["status"] != "preliminary" or
-                not construction.get("writeback_eligible", True)):
+                not construction.get("writeback_eligible", False)):
             continue
         for reaction in construction["reactions"]:
             if reaction.get("is_structural_link"):
