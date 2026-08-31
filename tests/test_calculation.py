@@ -25,16 +25,16 @@ class CalculationTests(unittest.TestCase):
         constructions = build_constructions(document)
         result = calculate_reactions(document, constructions)["constructions"][0]
         self.assertEqual(result["status"], "preliminary")
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 200)
-        self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], 125)
-        self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 75)
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 220)
+        self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], 135)
+        self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 85)
         self.assertAlmostEqual(
             result["reactions"][0]["preliminary_high_hook_mass_kg"], 135)
         self.assertTrue(result["validation"]["calculated"])
         self.assertTrue(result["validation"]["equilibrium_valid"])
-        self.assertFalse(result["validation"]["support_model_valid"])
+        self.assertTrue(result["validation"]["support_model_valid"])
         self.assertFalse(result["load_transfer_eligible"])
-        self.assertIn("tension_only_contact_mass_model_not_implemented",
+        self.assertIn("tension_only_contact_model_diagnostic_not_writeback_source",
                       result["issues"])
 
     def test_configured_cable_rate_is_applied_over_each_truss_length(self):

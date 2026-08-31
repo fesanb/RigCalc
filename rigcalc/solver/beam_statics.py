@@ -5,6 +5,7 @@ dialogs, report writers, or object handles.
 """
 
 from .validation import finalize_eligibility
+from .contact import contact_mass_by_support, engaged_contact_mass_loads
 from .inclined_geometry import inclined_station_coordinates, horizontal_coordinate
 
 
@@ -124,15 +125,42 @@ def solve_two_support_beam(construction, loads):
         if span <= 1e-6:
             result["issues"].append("zero_support_span")
         else:
-            right_reaction = sum(
-                load["mass_kg"] * (load["station_mm"] - a) / span
-                for load in loads)
-            total = result["total_applied_mass_kg"]
+            def reaction_values(load_set):
+                right = sum(
+                    load["mass_kg"] * (load["station_mm"] - a) / span
+                    for load in load_set)
+                total_mass = sum(load["mass_kg"] for load in load_set)
+                return total_mass-right, right
+
+            signed_values = reaction_values(loads)
+            hoists = [item for item in supports if not item.item.is_structural_link]
+            contact_loads = []
+            if all(value >= -1.0e-6 for value in signed_values):
+                contact_loads = engaged_contact_mass_loads(hoists)
+            analysis_loads = list(loads) + contact_loads
+            result["loads"] = analysis_loads
+            result["total_applied_mass_kg"] = sum(
+                item["mass_kg"] for item in analysis_loads)
+            left_reaction, right_reaction = reaction_values(analysis_loads)
             for support, reaction in (
-                    (left, total - right_reaction), (right, right_reaction)):
-                result["reactions"].append(_reaction_record(support, reaction))
+                    (left, left_reaction), (right, right_reaction)):
+                record = _reaction_record(support, reaction)
+                record["unconstrained_reaction_mass_kg"] = signed_values[
+                    0 if support is left else 1]
+                result["reactions"].append(record)
+            contact_masses = contact_mass_by_support(analysis_loads)
+            for reaction in result["reactions"]:
+                mass = contact_masses.get(reaction["support_id"], 0.0)
+                if mass:
+                    reaction["contact_mass_included_kg"] = mass
+                    reaction["preliminary_high_hook_mass_kg"] = (
+                        reaction["reaction_mass_kg"])
+                    reaction["high_hook_mass_basis"] = (
+                        "reaction_includes_engaged_contact_mass_diagnostic")
             result["status"] = "preliminary"
-            result["method"] = "two_support_static_equilibrium"
+            result["method"] = (
+                "two_support_tension_only_contact_state"
+                if contact_loads else "two_support_static_equilibrium")
             reaction_total = sum(
                 item["reaction_mass_kg"] for item in result["reactions"])
             reaction_moment = sum(
@@ -140,7 +168,7 @@ def solve_two_support_beam(construction, loads):
                 for item in result["reactions"])
             applied_moment = sum(
                 item["mass_kg"]*item["station_mm"]/1000.0
-                for item in loads)
+                for item in analysis_loads)
             vertical_error = reaction_total-result["total_applied_mass_kg"]
             moment_error = reaction_moment-applied_moment
             vertical_tolerance = max(
@@ -157,20 +185,18 @@ def solve_two_support_beam(construction, loads):
             }
             # Preserve signed reactions as uplift diagnostics, but never use a
             # bilateral solution with hoist uplift as an approved load source.
-            support_model_valid = not any(
-                item["reaction_mass_kg"] < -1.0e-6 and
-                not item["is_structural_link"]
-                for item in result["reactions"])
-            if any(not item["is_structural_link"]
-                   for item in result["reactions"]):
-                # A signed result is still useful, but the product policy
-                # requires cable slack/re-engagement and contact mass before
-                # a hoist-supported model can authorize writeback or transfer.
+            support_model_valid = not any(value < -1.0e-6
+                                          for value in signed_values)
+            if hoists and not contact_loads:
                 support_model_valid = False
                 result["issues"].append(
                     "tension_only_contact_mass_model_not_implemented")
+            elif hoists:
+                result["issues"].append(
+                    "tension_only_contact_model_diagnostic_not_writeback_source")
             finalize_eligibility(
-                result, support_model_valid=support_model_valid)
+                result, support_model_valid=support_model_valid,
+                permit_writeback=not hoists)
     return result
 
 
