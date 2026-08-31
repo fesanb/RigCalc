@@ -54,6 +54,16 @@ class NotificationEvaluationTests(unittest.TestCase):
         item = evaluate_hoist_overloads(value)[0]
         self.assertIn("DIAGNOSTIC OVERLOAD", item["message"])
 
+    def test_contact_model_pending_validation_overload_remains_visible(self):
+        value = calculation(reaction(1100, 1000))
+        value["constructions"][0].update({
+            "writeback_eligible": False,
+            "issues": [
+                "tension_only_contact_model_diagnostic_not_writeback_source"],
+        })
+        self.assertIn("DIAGNOSTIC OVERLOAD",
+                      evaluate_hoist_overloads(value)[0]["message"])
+
     def test_deflection_is_an_orange_informational_marker(self):
         value = calculation()
         value["constructions"][0]["deflection"] = {"spans": [{

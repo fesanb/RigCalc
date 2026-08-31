@@ -119,6 +119,11 @@ class CorotationalTests(unittest.TestCase):
                          10.0)
         self.assertEqual(result["reactions"][1]["contact_mass_included_kg"],
                          20.0)
+        self.assertIn(
+            "tension_only_contact_model_diagnostic_not_writeback_source",
+            result["issues"])
+        self.assertNotIn("tension_only_contact_mass_model_not_implemented",
+                         result["issues"])
         self.assertIn("includes engaged contact mass",
                       make_calculation_text({"constructions": [result]}))
 

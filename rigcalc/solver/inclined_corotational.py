@@ -257,5 +257,9 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     if not solved["converged"]:
         result["issues"].append("nonlinear_solution_did_not_converge")
     result["issues"].append("diagnostic_not_writeback_source")
-    result["issues"].append("tension_only_contact_mass_model_not_implemented")
+    if contact_masses:
+        result["issues"].append(
+            "tension_only_contact_model_diagnostic_not_writeback_source")
+    else:
+        result["issues"].append("tension_only_contact_mass_model_not_implemented")
     return result

@@ -15,7 +15,9 @@ def evaluate_hoist_overloads(calculation, tolerance_kg=0.1):
         diagnostic_contact_result = (
             status == "diagnostic" or
             "tension_only_contact_mass_model_not_implemented" in issues or
-            "tension_only_active_set_no_feasible_solution" in issues)
+            "tension_only_active_set_no_feasible_solution" in issues or
+            "tension_only_contact_model_diagnostic_not_writeback_source"
+            in issues)
         normal_eligible_result = (
             status == "preliminary" and
             construction.get("writeback_eligible", False))
