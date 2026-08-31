@@ -30,6 +30,13 @@ def make_calculation_text(data):
             "Applied mass: {:.2f} kg".format(item["total_applied_mass_kg"]),
         ])
         validation = item.get("validation", {})
+        load_model = item.get("load_model", {})
+        if load_model:
+            lines.append(
+                "Load model: direction={} reference={} distributed={}".format(
+                    load_model.get("direction", "-"),
+                    load_model.get("reference_configuration", "-"),
+                    load_model.get("distributed_load", "-")))
         if validation:
             lines.append(
                 "Validation: equilibrium={} support model={} numerical={} "

@@ -7,6 +7,7 @@ from rigcalc.solver.beam_statics import trace_construction_loads
 from rigcalc.solver.nonlinear_beam import solve_corotational_beam
 from rigcalc.solver.nonlinear_beam import calculate_corotational_reactions
 from rigcalc.model import DocumentModel
+from rigcalc.report.calculation_report import make_calculation_text
 from tests.test_continuous_beam import construction, section
 
 
@@ -45,6 +46,10 @@ class CorotationalTests(unittest.TestCase):
         self.assertEqual(len(result["stations"]), 3)
         self.assertLess(result["stations"][-1]["displacements"]["ux_m"], 0.0)
         self.assertFalse(result["writeback_eligible"])
+        self.assertEqual(result["load_model"]["direction"],
+                         "fixed_global_negative_z")
+        self.assertIn("equivalent_nodal_gravity_load_not_follower",
+                      make_calculation_text({"constructions": [result]}))
 
     def test_diagnostic_nonlinear_reaction_is_not_transferred(self):
         lower = construction(10000, [0, 10000], total_mass_kg=100)

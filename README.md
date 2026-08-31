@@ -234,6 +234,11 @@ the original signed reaction remains in the report as uplift diagnostic data.
 Approved hoist reactions are written to the High Hook fields, and forces in
 structural Truss Cross connections are written back in newtons.
 
+The diagnostic corotational branch models distributed mass as a fixed global
+vertical gravity load based on the undeformed station geometry; it is not a
+follower load. Its assumptions and numerical status are written into the
+calculation reports and it is never selected for automatic writeback.
+
 Every discovered hoist also appears in `rigcalc_hoist_outcomes`. A supported,
 validated result is marked `calculated`; a visible but writeback-blocked result
 is `diagnostic_only`; and an unresolvable hoist is reported as `0.00 kN` with

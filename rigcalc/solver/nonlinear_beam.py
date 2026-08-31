@@ -24,6 +24,11 @@ def solve_corotational_beam(construction, loads, progress=None):
         "method": "corotational_2d_frame", "loads": loads,
         "writeback_eligible": False,
         "load_transfer_eligible": False,
+        "load_model": {
+            "direction": "fixed_global_negative_z",
+            "reference_configuration": "undeformed_station_geometry",
+            "distributed_load": "equivalent_nodal_gravity_load_not_follower",
+        },
         "total_applied_mass_kg": sum(item["mass_kg"] for item in loads),
         "reactions": [], "stations": [], "element_forces": [], "issues": [],
     }
