@@ -160,24 +160,43 @@ def evaluate_support_model_failures(calculation):
     """Expose blocked tension-only support models at the affected hoist."""
     notifications = []
     for construction in calculation.get("constructions", []):
-        if "tension_only_active_set_no_feasible_solution" not in construction.get("issues", []):
-            continue
-        negative = next((item for item in construction.get("reactions", [])
-                         if item.get("reaction_mass_kg", 0.0) < -1.0e-6),
-                        None)
-        support_id = str((negative or {}).get("support_id", ""))
-        hoist_id = str((negative or {}).get("support_hoist_id") or support_id)
+        issues = construction.get("issues", [])
         construction_id = str(construction.get("construction_id", ""))
-        notifications.append({
-            "id": "support_model:{}".format(construction_id),
-            "type": "support_model_failure",
-            "severity": "error",
-            "class_name": LOAD_NOTIFICATION_CLASS,
-            "construction_id": construction_id,
-            "support_id": support_id,
-            "message": "SUPPORT MODEL\n{}\n{}: cable slack / uplift\nNo feasible tension-only solution".format(
-                construction_id, hoist_id or "support"),
-        })
+        if "tension_only_active_set_no_feasible_solution" in issues:
+            negative = next((item for item in construction.get("reactions", [])
+                             if item.get("reaction_mass_kg", 0.0) < -1.0e-6),
+                            None)
+            support_id = str((negative or {}).get("support_id", ""))
+            hoist_id = str((negative or {}).get("support_hoist_id") or support_id)
+            notifications.append({
+                "id": "support_model:{}".format(construction_id),
+                "type": "support_model_failure",
+                "severity": "error",
+                "class_name": LOAD_NOTIFICATION_CLASS,
+                "construction_id": construction_id,
+                "support_id": support_id,
+                "message": "SUPPORT MODEL\n{}\n{}: cable slack / uplift\nNo feasible tension-only solution".format(
+                    construction_id, hoist_id or "support"),
+            })
+            continue
+        if "tension_only_contact_mass_model_not_implemented" not in issues:
+            continue
+        for reaction in construction.get("reactions", []):
+            if (reaction.get("is_structural_link") or
+                    reaction.get("support_kind") != "hoist"):
+                continue
+            support_id = str(reaction.get("support_id", ""))
+            hoist_id = str(reaction.get("support_hoist_id") or support_id)
+            notifications.append({
+                "id": "contact_model:{}:{}".format(construction_id, support_id),
+                "type": "support_contact_model_pending",
+                "severity": "error",
+                "class_name": LOAD_NOTIFICATION_CLASS,
+                "construction_id": construction_id,
+                "support_id": support_id,
+                "message": "CONTACT MODEL\n{}: diagnostic only\nNo writeback: slack / mass model".format(
+                    hoist_id),
+            })
     return notifications
 
 

@@ -87,6 +87,18 @@ class NotificationEvaluationTests(unittest.TestCase):
         self.assertEqual(items[0]["class_name"], "RigCalc-Load")
         self.assertIn("cable slack / uplift", items[0]["message"])
 
+    def test_missing_contact_mass_model_marks_each_affected_hoist(self):
+        value = calculation(reaction(120, 250, "H1"),
+                            reaction(130, 250, "H2"))
+        value["constructions"][0].update({
+            "writeback_eligible": False,
+            "issues": ["tension_only_contact_mass_model_not_implemented"],
+        })
+        items = evaluate_support_model_failures(value)
+        self.assertEqual([item["support_id"] for item in items], ["H1", "H2"])
+        self.assertTrue(all("diagnostic only" in item["message"]
+                            for item in items))
+
 
 class FakeVS:
     def __init__(self):
