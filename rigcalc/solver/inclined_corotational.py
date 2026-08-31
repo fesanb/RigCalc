@@ -10,7 +10,8 @@ from math import sqrt
 
 from .beam_statics import _reaction_record
 from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
-                              STATION_TOLERANCE_MM, _section_at)
+                              STATION_TOLERANCE_MM, _section_at,
+                              _section_result)
 from .corotational import (CorotationalElement, CorotationalModel,
                            CorotationalNode, solve_corotational)
 from .deflection import build_deflection_summary, support_span_midpoints
@@ -72,6 +73,28 @@ def _node_loads(stations, nodes, loads):
     return loads_by_station
 
 
+def _contact_mass_loads(hoists):
+    """Represent engaged hoist/chain mass at each active truss contact.
+
+    This is intentionally a load-model input rather than a writeback value.
+    A candidate state includes the mass only while its chain is engaged.
+    """
+    result = []
+    for attached in hoists:
+        mass = attached.item.weight_with_chain_kg
+        station = attached.attachment.global_station_mm
+        if mass <= 0.0 or station is None:
+            continue
+        result.append({
+            "source_id": "{}:contact_mass".format(attached.item.id),
+            "source_type": "hoist_chain_contact_mass",
+            "mass_kg": mass,
+            "station_mm": station,
+            "evidence": "BrxHoist.WeightWithChain; engaged_contact_state",
+        })
+    return result
+
+
 def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                                      _signed_reactions=None):
     all_supports = sorted(
@@ -90,6 +113,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
             "direction": "fixed_global_negative_z",
             "reference_configuration": "undeformed_inclined_chord_geometry",
             "distributed_load": "equivalent_nodal_gravity_load_not_follower",
+            "contact_mass": "engaged hoist/chain mass is a point load",
         },
         "writeback_eligible": False,
         "load_transfer_eligible": False,
@@ -119,6 +143,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
         load=tuple(node_loads[index]))
         for index, (station, (x, z)) in enumerate(zip(stations, points))]
     elements = []
+    element_sections = {}
     for index, (start, end) in enumerate(zip(stations, stations[1:])):
         section = _section_at(construction, (start+end)/2.0)
         if section is None:
@@ -133,6 +158,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
         elements.append(CorotationalElement(
             "E{:04d}".format(index), nodes[index].id, nodes[index+1].id,
             section.elastic_modulus_pa, section.area_m2, section.iyy_m4))
+        element_sections["E{:04d}".format(index)] = _section_result(section)
     try:
         solved = solve_corotational(CorotationalModel(nodes, elements))
     except ValueError as error:
@@ -150,6 +176,20 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                      <= STATION_TOLERANCE_MM)
         result["reactions"].append(_reaction_record(
             support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
+    contact_mass_by_support = {
+        item["source_id"].split(":", 1)[0]: item["mass_kg"]
+        for item in loads if item.get("source_type") ==
+        "hoist_chain_contact_mass"}
+    for reaction in result["reactions"]:
+        mass = contact_mass_by_support.get(reaction["support_id"], 0.0)
+        if mass:
+            reaction["contact_mass_included_kg"] = mass
+            # The reaction already includes this contact load. It must never
+            # be added again as an apparently approved High Hook value.
+            reaction["preliminary_high_hook_mass_kg"] = (
+                reaction["reaction_mass_kg"])
+            reaction["high_hook_mass_basis"] = (
+                "reaction_includes_engaged_contact_mass_diagnostic")
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
     if _active_ids is None:
@@ -163,8 +203,11 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                                    if item.item.is_structural_link})
                     if len(active_ids) < 2:
                         continue
+                    candidate_loads = list(loads) + _contact_mass_loads(
+                        selected)
                     candidate = solve_inclined_corotational_beam(
-                        construction, loads, active_ids, _signed_reactions)
+                        construction, candidate_loads, active_ids,
+                        _signed_reactions)
                     if (candidate["status"] != "diagnostic" or
                             not candidate.get("converged") or
                             any(item["reaction_mass_kg"] < -1.0e-6
@@ -193,6 +236,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                 result["active_set_validation"] = {
                     "method": "exhaustive_inclined_corotational_contact_state",
                     "candidate_sets_valid": len(candidates),
+                    "contact_mass_model": "engaged_support_point_load",
                 }
                 return result
             result["issues"].append("tension_only_active_set_no_feasible_solution")
@@ -225,7 +269,14 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     result["deflection"] = build_deflection_summary(
         result["stations"],
         [item.attachment.global_station_mm for item in supports])
-    result["element_forces"] = solved["element_results"]
+    result["element_forces"] = [{
+        "element_id": item["element_id"],
+        "start_station_mm": stations[int(item["element_id"][1:])],
+        "end_station_mm": stations[int(item["element_id"][1:])+1],
+        "length_m": item["length_m"],
+        "cross_section": element_sections[item["element_id"]],
+        "i": item["i"], "j": item["j"],
+    } for item in solved["element_results"]]
     result["status"] = "diagnostic" if solved["converged"] else "not_calculated"
     if not solved["converged"]:
         result["issues"].append("nonlinear_solution_did_not_converge")

@@ -103,6 +103,25 @@ class CorotationalTests(unittest.TestCase):
         self.assertLess(result["reactions"][0]["reaction_mass_kg"], 0.0)
         self.assertGreater(result["reactions"][1]["reaction_mass_kg"], 0.0)
 
+    def test_inclined_contact_state_includes_engaged_hoist_chain_mass(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        item.supports[0].item.weight_with_chain_kg = 10.0
+        item.supports[1].item.weight_with_chain_kg = 20.0
+        result = solve_corotational_beam(
+            item, trace_construction_loads(item))
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+                               places=3)
+        self.assertAlmostEqual(sum(item["reaction_mass_kg"]
+                                   for item in result["reactions"]), 130.0,
+                               places=3)
+        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
+                         10.0)
+        self.assertEqual(result["reactions"][1]["contact_mass_included_kg"],
+                         20.0)
+        self.assertIn("includes engaged contact mass",
+                      make_calculation_text({"constructions": [result]}))
+
 
 if __name__ == "__main__":
     unittest.main()
