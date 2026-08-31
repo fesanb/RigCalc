@@ -322,6 +322,28 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertIn("Validation: equilibrium=yes support model=yes", report)
         self.assertIn("unconstrained signed reaction", report)
 
+    def test_unproven_tension_only_set_is_diagnostic_and_writeback_blocked(self):
+        load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
+        item = construction(
+            10000, [2000, 8000], total_mass_kg=0,
+            point_loads=[AttachedObject(load, attachment(10000))])
+        result = solve(item)
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertFalse(result["writeback_eligible"])
+        self.assertIn("tension_only_active_set_no_feasible_solution",
+                      result["issues"])
+
+    def test_tension_only_search_limit_is_diagnostic_and_writeback_blocked(self):
+        stations = [index*1000.0 for index in range(1, 10)]
+        load = PointLoad("P", "", Point3D(0, 0), "Load", 1000.0)
+        result = solve(construction(
+            10000, stations, total_mass_kg=0,
+            point_loads=[AttachedObject(load, attachment(0))]))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertFalse(result["writeback_eligible"])
+        self.assertIn("tension_only_active_set_limit_exceeded",
+                      result["issues"])
+
 
 if __name__ == "__main__":
     unittest.main()

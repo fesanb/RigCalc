@@ -76,7 +76,11 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
                 if item.attachment.global_station_mm is not None]
     hoists = [item for item in supports if not item.item.is_structural_link]
     if len(hoists) > MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS:
-        return None
+        if all(item["reaction_mass_kg"] >= -1.0e-6
+               for item in signed_reactions
+               if not item["is_structural_link"]):
+            return "all_active_nonnegative", None
+        return "limit_exceeded", None
     structural_ids = {item.item.id for item in supports
                       if item.item.is_structural_link}
     candidates, evaluated = [], 0
@@ -107,7 +111,7 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
             if active_valid and released_valid:
                 candidates.append((len(active_hoists), candidate))
     if not candidates:
-        return None
+        return "no_feasible_solution", None
     # Prefer the valid contact set with the most engaged hoists. This is also
     # deterministic in degenerate zero-reaction cases.
     result = max(candidates, key=lambda item: item[0])[1]
@@ -117,7 +121,7 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
         "candidate_sets_valid": len(candidates),
         "released_support_displacement_rule": "uz_m <= 1e-8",
     }
-    return result
+    return "resolved", result
 
 
 def solve_continuous_beam(construction, loads, _active_support_ids=None,
@@ -241,24 +245,21 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
             _reaction_record(support, reaction_n/GRAVITY_M_S2))
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
+    active_set_issue = None
     if _resolve_tension_only and _active_support_ids is None:
-        active_set_result = _resolve_tension_only_active_set(
+        active_set_state, active_set_result = _resolve_tension_only_active_set(
             construction, loads, _signed_reactions)
-        if active_set_result is not None:
+        if active_set_state == "resolved":
             return active_set_result
+        if active_set_state != "all_active_nonnegative":
+            active_set_issue = {
+                "no_feasible_solution": "tension_only_active_set_no_feasible_solution",
+                "limit_exceeded": "tension_only_active_set_limit_exceeded",
+            }[active_set_state]
     negative_hoists = [
         item for item in result["reactions"]
         if item["reaction_mass_kg"] < -1.0e-6 and
         not item["is_structural_link"]]
-    if (_resolve_tension_only and negative_hoists and len(supports) > 2):
-        released = min(
-            negative_hoists, key=lambda item: item["reaction_mass_kg"])
-        active_ids = {item.item.id for item in supports}
-        active_ids.remove(released["support_id"])
-        return solve_continuous_beam(
-            construction, loads, _active_support_ids=active_ids,
-            _signed_reactions=_signed_reactions,
-            _resolve_tension_only=True)
     active_reactions = {
         item["support_id"]: item for item in result["reactions"]}
 
@@ -362,10 +363,17 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         result["stations"], support_stations)
     result["status"] = "preliminary"
     result["method"] = "linear_planar_continuous_beam_vertical_supports"
-    if negative_hoists:
-        result["issues"].append("tension_only_support_set_unresolved")
+    if active_set_issue:
+        result["issues"].append(active_set_issue)
+        result["status"] = "diagnostic"
+    elif _resolve_tension_only and _active_support_ids is None:
+        result["active_set_validation"] = {
+            "method": "all_active_hoists_nonnegative",
+            "candidate_sets_evaluated": 1,
+        }
     finalize_eligibility(
-        result, support_model_valid=not negative_hoists,
+        result, support_model_valid=(not negative_hoists and
+                                     active_set_issue is None),
         numerical_valid=(result["numerical_diagnostics"]
                          ["relative_reduced_residual"] <= 1.0e-8))
     released_count = sum(
