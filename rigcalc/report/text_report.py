@@ -6,6 +6,19 @@ def _item_name(item):
     return getattr(item, "hoist_id", "") or item.name or item.id
 
 
+def _append_attachment_diagnostic(lines, diagnostic):
+    if not diagnostic:
+        return
+    lines.append("    REASON: {}".format(diagnostic.get("reason", "-")))
+    for carrier in diagnostic.get("competing_carriers", []):
+        lines.append(
+            "    competing carrier: {} / {} clearance {:.1f} mm "
+            "axis {:.1f} mm ({})".format(
+                carrier["construction_id"], carrier["truss_id"],
+                carrier["carrier_clearance_mm"],
+                carrier["axis_distance_mm"], carrier["method"]))
+
+
 def make_text_report(document, constructions):
     lines = ["RIGCALC GEOMETRY MODEL", "=" * 72,
              "Constructions: {}".format(len(constructions)),
@@ -63,22 +76,24 @@ def make_text_report(document, constructions):
         lines.extend(["", "CALCULATION INPUT", "  Structural span: {}".format(mm_to_m(construction.structural_span_mm)), "", "  SUPPORTS"])
         supports = sorted(construction.supports, key=lambda item: item.attachment.global_station_mm if item.attachment.global_station_mm is not None else float("inf"))
         lines.extend(["    none"] if not supports else [
-            "    {}  {}  axis offset {:.1f} mm clearance {:.1f} mm {} {}".format(
+            "    {}  {}  axis offset {:.1f} mm clearance {:.1f} mm {} {} {}".format(
                 mm_to_m(value.attachment.global_station_mm), _item_name(value.item),
                 value.attachment.distance_from_truss_axis_mm,
                 value.attachment.carrier_clearance_mm or 0.0,
                 value.attachment.method,
+                value.attachment.confidence,
                 "WARNING" if value.attachment.warning else "")
             for value in supports])
         lines.extend(["", "  POINT LOADS"])
         loads = sorted(construction.point_loads, key=lambda item: item.attachment.global_station_mm if item.attachment.global_station_mm is not None else float("inf"))
         lines.extend(["    none"] if not loads else [
-            "    {}  {}  {}  axis offset {:.1f} mm clearance {:.1f} mm {} {}".format(
+            "    {}  {}  {}  axis offset {:.1f} mm clearance {:.1f} mm {} {} {}".format(
                 mm_to_m(value.attachment.global_station_mm), _item_name(value.item),
                 "{:.2f} kg".format(value.item.weight_kg) if value.item.weight_kg is not None else str(value.item.weight_raw),
                 value.attachment.distance_from_truss_axis_mm,
                 value.attachment.carrier_clearance_mm or 0.0,
                 value.attachment.method,
+                value.attachment.confidence,
                 "WARNING" if value.attachment.warning else "")
             for value in loads])
         lines.extend(["", "  DISTRIBUTED LOADS"])
@@ -87,15 +102,16 @@ def make_text_report(document, constructions):
             key=lambda item: item.attachment.global_station_mm
             if item.attachment.global_station_mm is not None else float("inf"))
         lines.extend(["    none"] if not distributed else [
-            "    {}  {}  total {:.2f} kg over {:.3f} m ({:.2f} kg/m) {}".format(
+            "    {}  {}  total {:.2f} kg over {:.3f} m ({:.2f} kg/m) {} {}".format(
                 mm_to_m(value.attachment.global_station_mm), _item_name(value.item),
                 value.item.total_mass_kg or 0.0,
                 (value.item.length_mm or 0.0) / 1000.0,
                 value.item.mass_per_m_kg or 0.0,
-                value.attachment.method)
+                value.attachment.method, value.attachment.confidence)
             for value in distributed])
         lines.append("")
-    if document.unassigned_supports or document.unassigned_point_loads:
+    if (document.unassigned_supports or document.unassigned_point_loads or
+            document.unassigned_distributed_loads):
         lines.extend(["=" * 72, "UNASSIGNED OBJECTS", "=" * 72])
         for item in document.unassigned_supports:
             lines.append("  HOIST {} {} at ({:.1f}, {:.1f}, {:.1f})".format(
@@ -103,7 +119,7 @@ def make_text_report(document, constructions):
                 item.position.z))
             diagnostic = document.unassigned_support_diagnostics.get(item.id, {})
             if diagnostic:
-                lines.append("    REASON: {}".format(diagnostic.get("reason")))
+                _append_attachment_diagnostic(lines, diagnostic)
                 for label in ("nearest_3d", "nearest_plan"):
                     nearest = diagnostic.get(label)
                     if nearest:
@@ -116,5 +132,13 @@ def make_text_report(document, constructions):
             lines.append("  LOAD {} {} at ({:.1f}, {:.1f}, {:.1f})".format(
                 item.id, _item_name(item), item.position.x, item.position.y,
                 item.position.z))
+            _append_attachment_diagnostic(
+                lines, document.unassigned_attachment_diagnostics.get(item.id))
+        for item in document.unassigned_distributed_loads:
+            lines.append("  DISTRIBUTED LOAD {} {} at ({:.1f}, {:.1f}, {:.1f})".format(
+                item.id, _item_name(item), item.position.x, item.position.y,
+                item.position.z))
+            _append_attachment_diagnostic(
+                lines, document.unassigned_attachment_diagnostics.get(item.id))
         lines.append("")
     return "\n".join(lines)

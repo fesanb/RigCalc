@@ -1,6 +1,7 @@
 import unittest
 
 from rigcalc.model import DocumentModel, Point3D, PointLoad, Support, TrussSegment
+from rigcalc.report.text_report import make_text_report
 from rigcalc.topology import build_constructions
 
 
@@ -110,11 +111,14 @@ class AttachmentTests(unittest.TestCase):
         load = PointLoad("L1", "Load", Point3D(1500, 0),
                          "Lighting Device", 20.0)
         document = DocumentModel(trusses=[first, second], point_loads=[load])
-        build_constructions(document)
+        constructions = build_constructions(document)
         self.assertEqual(document.unassigned_point_loads, [load])
         diagnostic = document.unassigned_attachment_diagnostics["L1"]
         self.assertEqual(diagnostic["reason"], "ambiguous_geometry_attachment")
         self.assertEqual(len(diagnostic["competing_carriers"]), 2)
+        report = make_text_report(document, constructions)
+        self.assertIn("REASON: ambiguous_geometry_attachment", report)
+        self.assertIn("competing carrier:", report)
 
     def test_explicit_uuid_resolves_inclined_truss_with_plan_geometry(self):
         start = Point3D(0, 0, 1000)
