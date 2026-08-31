@@ -6,4 +6,6 @@ from .run_summary import build_run_summary, make_run_summary_text
 __all__ = [
     "build_run_summary", "make_run_summary_text",
     "make_calculation_text", "make_text_report", "write_json_report",
+    "build_hoist_outcomes", "make_hoist_outcomes_text",
 ]
+from .hoist_outcomes import build_hoist_outcomes, make_hoist_outcomes_text

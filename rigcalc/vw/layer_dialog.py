@@ -70,6 +70,29 @@ def _parse_number(text, default, minimum=0.0, strictly_positive=False):
     return max(minimum, value)
 
 
+def preflight_context(vs, inventory, previous_layers):
+    """Return only shallow, non-mutating context for the setup dialog."""
+    document_name = "Unsaved document"
+    try:
+        value = vs.GetFName() if hasattr(vs, "GetFName") else ""
+        if value:
+            document_name = str(value)
+    except Exception:
+        # The dialog must stay usable with Vectorworks API wrapper variants.
+        pass
+    records = {}
+    for item in inventory:
+        name = item.get("parametric_record", "Unknown")
+        records[name] = records.get(name, 0) + 1
+    return {
+        "document_name": document_name,
+        "candidate_layer_count": len(candidate_layers(inventory)),
+        "relevant_object_count": sum(records.values()),
+        "previous_selection_available": bool(previous_layers),
+        "record_counts": records,
+    }
+
+
 def choose_calculation_scope(vs, inventory, output_dir):
     layers = candidate_layers(inventory)
     if not layers:
@@ -80,11 +103,12 @@ def choose_calculation_scope(vs, inventory, output_dir):
     selection_path = os.path.join(output_dir, "rigcalc_layer_selection.json")
     previous_values = _read_previous_values(selection_path)
     previous_layers = set(previous_values.get("included_layers", []))
+    context = preflight_context(vs, inventory, previous_layers)
     dialog = vs.CreateLayout(
         "RigCalc | Calculation Setup", False,
         "Run Calculation", "Cancel")
 
-    title_id, intro_id, layer_heading_id = 4, 5, 6
+    title_id, document_id, intro_id, mutation_id, layer_heading_id = 4, 26, 5, 27, 6
     cable_label_id, cable_edit_id = 7, 8
     factor_label_id, factor_edit_id = 9, 20
     load_heading_id, load_help_id = 21, 22
@@ -94,9 +118,19 @@ def choose_calculation_scope(vs, inventory, output_dir):
     vs.CreateStaticText(
         dialog, title_id, "RIGCALC  /  CALCULATION SETUP", 76)
     vs.CreateStaticText(
+        dialog, document_id, "Document: {}".format(
+            context["document_name"]), 76)
+    vs.CreateStaticText(
         dialog, intro_id,
-        "Choose layers belonging to the suspended system. Exclude floor "
-        "equipment, storage, venue geometry, and presentation layers.", 76)
+        "{} relevant objects on {} candidate layers. Choose layers belonging "
+        "to the suspended system.{}".format(
+            context["relevant_object_count"], context["candidate_layer_count"],
+            " Previous selections are suggestions only."
+            if context["previous_selection_available"] else ""), 76)
+    vs.CreateStaticText(
+        dialog, mutation_id,
+        "On Run, RigCalc may assign Hoist IDs, replace its own markers, and "
+        "write eligible High Hook and Truss Cross values.", 76)
     vs.CreateStaticText(
         dialog, layer_heading_id,
         "--- 1. CALCULATION LAYERS --------------------------------", 76)
@@ -128,8 +162,10 @@ def choose_calculation_scope(vs, inventory, output_dir):
         "rigging decisions.", 76)
 
     vs.SetFirstLayoutItem(dialog, title_id)
-    vs.SetBelowItem(dialog, title_id, intro_id, 0, 1)
-    vs.SetBelowItem(dialog, intro_id, layer_heading_id, 0, 2)
+    vs.SetBelowItem(dialog, title_id, document_id, 0, 1)
+    vs.SetBelowItem(dialog, document_id, intro_id, 0, 1)
+    vs.SetBelowItem(dialog, intro_id, mutation_id, 0, 1)
+    vs.SetBelowItem(dialog, mutation_id, layer_heading_id, 0, 2)
     for index in range(len(layers)):
         item_id = first_checkbox_id + index
         anchor = layer_heading_id if index == 0 else item_id - 1

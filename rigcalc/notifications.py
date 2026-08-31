@@ -181,6 +181,27 @@ def evaluate_support_model_failures(calculation):
     return notifications
 
 
+def evaluate_zero_hoist_outcomes(outcomes):
+    """Mark hoists with no viable calculation without treating zero as load."""
+    notifications = []
+    for outcome in outcomes:
+        if outcome.get("status") != "zero_not_calculated":
+            continue
+        hoist_id = str(outcome.get("hoist_id") or outcome["support_id"])
+        notifications.append({
+            "id": "hoist_zero_outcome:{}".format(outcome["support_id"]),
+            "type": "hoist_zero_outcome",
+            "severity": "error",
+            "class_name": LOAD_NOTIFICATION_CLASS,
+            "construction_id": "",
+            "support_id": outcome["support_id"],
+            "hoist_id": hoist_id,
+            "message": "NO CALCULATION\n{}  0.00 kN\n{}".format(
+                hoist_id, outcome.get("reason", "no_viable_carrier")),
+        })
+    return notifications
+
+
 def evaluate_notifications(calculation):
     return (evaluate_hoist_overloads(calculation) +
             evaluate_deflections(calculation) +

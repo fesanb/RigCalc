@@ -2,7 +2,8 @@ import unittest
 import tempfile
 
 from rigcalc.vw.layer_dialog import (candidate_layers,
-                                      choose_calculation_scope)
+                                      choose_calculation_scope,
+                                      preflight_context)
 
 
 class FakeDialogVS:
@@ -13,6 +14,7 @@ class FakeDialogVS:
         self.alerts = []
 
     def CreateLayout(self, *args): return 1
+    def GetFName(self): return "Representative rig.vwx"
     def CreateStaticText(self, *args): pass
     def SetFirstLayoutItem(self, *args): pass
     def SetBelowItem(self, *args): pass
@@ -54,6 +56,15 @@ class LayerDialogTests(unittest.TestCase):
         self.assertEqual(scope["cable_load_kg_m"], 2.0)
         self.assertEqual(scope["safety_factor"], 1.1)
         self.assertEqual(vs.alerts, [])
+
+    def test_preflight_context_is_shallow_and_marks_saved_selection_as_suggestion(self):
+        context = preflight_context(FakeDialogVS(), [
+            {"layer_name": "Rigging", "parametric_record": "TrussItem"},
+            {"layer_name": "Rigging", "parametric_record": "BrxHoist"},
+        ], {"Rigging"})
+        self.assertEqual(context["document_name"], "Representative rig.vwx")
+        self.assertEqual(context["relevant_object_count"], 2)
+        self.assertTrue(context["previous_selection_available"])
 
 
 if __name__ == "__main__":

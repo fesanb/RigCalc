@@ -3,9 +3,11 @@ import os
 
 from rigcalc import config
 from rigcalc.normalization import normalize_inventory
-from rigcalc.notifications import evaluate_notifications
+from rigcalc.notifications import (evaluate_notifications,
+                                   evaluate_zero_hoist_outcomes)
 from rigcalc.report import (build_run_summary, make_calculation_text,
-                            make_text_report,
+                            make_hoist_outcomes_text, make_text_report,
+                            build_hoist_outcomes,
                             write_json_report)
 from rigcalc.solver import (calculate_corotational_reactions,
                             calculate_reactions, compare_calculations,
@@ -168,7 +170,16 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(os.path.join(output_dir, "rigcalc_primary_calculation.txt"),
               "w", encoding="utf-8") as stream:
         stream.write(make_calculation_text(primary))
-    notifications = evaluate_notifications(primary)
+    hoist_outcomes = build_hoist_outcomes(document, primary)
+    with open(os.path.join(output_dir, "rigcalc_hoist_outcomes.json"),
+              "w", encoding="utf-8") as stream:
+        json.dump({"hoist_outcomes": hoist_outcomes}, stream,
+                  ensure_ascii=False, indent=2)
+    with open(os.path.join(output_dir, "rigcalc_hoist_outcomes.txt"),
+              "w", encoding="utf-8") as stream:
+        stream.write(make_hoist_outcomes_text(hoist_outcomes))
+    notifications = (evaluate_notifications(primary) +
+                     evaluate_zero_hoist_outcomes(hoist_outcomes))
     with open(os.path.join(output_dir, "rigcalc_notifications.json"),
               "w", encoding="utf-8") as stream:
         json.dump({"notifications": notifications}, stream,
