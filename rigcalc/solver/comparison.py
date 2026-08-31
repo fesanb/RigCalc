@@ -61,7 +61,7 @@ def select_primary_calculation(linear, nonlinear):
             nonlinear_item.get("validation", {}).get(
                 "vertical_equilibrium_ok") and
             nonlinear_item.get("validation", {}).get(
-                "moment_equilibrium_ok", True) and
+                "moment_equilibrium_ok", False) and
             nonlinear_item.get("validation", {}).get(
                 "support_model_valid", False) and
             nonlinear_item.get("validation", {}).get(

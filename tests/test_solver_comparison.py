@@ -21,6 +21,7 @@ class SolverComparisonTests(unittest.TestCase):
             "converged": converged,
             "validation": {
                 "vertical_equilibrium_ok": converged,
+                "moment_equilibrium_ok": converged,
                 "numerically_valid": converged,
                 "load_model_valid": converged,
             },
@@ -57,7 +58,8 @@ class SolverComparisonTests(unittest.TestCase):
         self.assertEqual(item["primary_solver"], "linear")
 
     def test_missing_explicit_numerical_or_load_validation_falls_back(self):
-        for key in ("numerically_valid", "load_model_valid"):
+        for key in ("moment_equilibrium_ok", "numerically_valid",
+                    "load_model_valid"):
             linear, nonlinear = self.calculations()
             nonlinear["constructions"][0]["writeback_eligible"] = True
             nonlinear["constructions"][0]["validation"]["support_model_valid"] = True
