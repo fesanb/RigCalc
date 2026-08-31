@@ -10,8 +10,16 @@ def evaluate_hoist_overloads(calculation, tolerance_kg=0.1):
     """Return load errors for valid hoist reactions above rated capacity."""
     notifications = []
     for construction in calculation.get("constructions", []):
-        if (construction.get("status") != "preliminary" or
-                not construction.get("writeback_eligible", False)):
+        status = construction.get("status")
+        issues = construction.get("issues", [])
+        diagnostic_contact_result = (
+            status == "diagnostic" or
+            "tension_only_contact_mass_model_not_implemented" in issues or
+            "tension_only_active_set_no_feasible_solution" in issues)
+        normal_eligible_result = (
+            status == "preliminary" and
+            construction.get("writeback_eligible", False))
+        if not normal_eligible_result and not diagnostic_contact_result:
             continue
         for reaction in construction.get("reactions", []):
             if (reaction.get("is_structural_link") or
@@ -27,6 +35,8 @@ def evaluate_hoist_overloads(calculation, tolerance_kg=0.1):
             hoist_id = str(reaction.get("support_hoist_id") or
                            reaction.get("support_name") or support_id)
             utilization = load / capacity
+            heading = ("OVERLOAD" if construction.get(
+                "writeback_eligible", False) else "DIAGNOSTIC OVERLOAD")
             notifications.append({
                 "id": "hoist_overload:{}".format(support_id),
                 "type": "hoist_overload",
@@ -38,8 +48,8 @@ def evaluate_hoist_overloads(calculation, tolerance_kg=0.1):
                 "actual_kg": load,
                 "capacity_kg": capacity,
                 "utilization": utilization,
-                "message": "OVERLOAD\n{}\n{:.0f} / {:.0f} kg ({:.0f} %)".format(
-                    hoist_id, load, capacity, utilization * 100.0),
+                "message": "{}\n{}\n{:.0f} / {:.0f} kg ({:.0f} %)".format(
+                    heading, hoist_id, load, capacity, utilization * 100.0),
             })
     return notifications
 
