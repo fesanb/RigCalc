@@ -65,6 +65,13 @@ class WriteProbeTests(unittest.TestCase):
             {field: value for field, value, _ in FIELD_PROBES})
         self.assertEqual(vs.events[-1], ("reset", "H1"))
 
+    def test_cancellation_mutates_no_probe_fields(self):
+        vs = FakeVS(handles=["H1"], proceed=False)
+        self.assertFalse(run(vs))
+        self.assertEqual(vs.values,
+                         {field: "0" for field, _, _ in FIELD_PROBES})
+        self.assertEqual(vs.events, [])
+
 
 if __name__ == "__main__":
     unittest.main()
