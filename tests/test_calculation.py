@@ -32,8 +32,10 @@ class CalculationTests(unittest.TestCase):
             result["reactions"][0]["preliminary_high_hook_mass_kg"], 135)
         self.assertTrue(result["validation"]["calculated"])
         self.assertTrue(result["validation"]["equilibrium_valid"])
-        self.assertTrue(result["validation"]["support_model_valid"])
-        self.assertTrue(result["load_transfer_eligible"])
+        self.assertFalse(result["validation"]["support_model_valid"])
+        self.assertFalse(result["load_transfer_eligible"])
+        self.assertIn("tension_only_contact_mass_model_not_implemented",
+                      result["issues"])
 
     def test_configured_cable_rate_is_applied_over_each_truss_length(self):
         start, end = Point3D(0, 0), Point3D(10000, 0)
@@ -68,7 +70,7 @@ class CalculationTests(unittest.TestCase):
         self.assertTrue(any(issue.startswith("mechanical_section_missing")
                             for issue in result["issues"]))
 
-    def test_high_hook_load_is_transferred_to_supporting_construction(self):
+    def test_unvalidated_hoist_load_is_not_transferred_to_supporting_construction(self):
         def attachment(station):
             return Attachment("T", "Truss", 0, station, station, station, 0)
 
@@ -98,11 +100,10 @@ class CalculationTests(unittest.TestCase):
         result = calculate_reactions(
             DocumentModel(), [upper, lower])["constructions"]
         by_id = {item["construction_id"]: item for item in result}
-        transferred = by_id["UPPER"]["loads"][0]
-        self.assertEqual(transferred["source_type"], "transferred_high_hook_load")
-        self.assertAlmostEqual(transferred["mass_kg"], 60)
-        self.assertAlmostEqual(by_id["UPPER"]["reactions"][0]["reaction_mass_kg"], 45)
-        self.assertAlmostEqual(by_id["UPPER"]["reactions"][1]["reaction_mass_kg"], 15)
+        self.assertFalse(any(item["source_type"] == "transferred_high_hook_load"
+                             for item in by_id["UPPER"]["loads"]))
+        self.assertIn("upstream_load_transfer_ineligible:LOWER",
+                      by_id["UPPER"]["issues"])
 
     def test_uplift_result_is_not_transferred_to_another_construction(self):
         def attachment(station):
@@ -200,12 +201,12 @@ class CalculationTests(unittest.TestCase):
         result = calculate_reactions(
             DocumentModel(), [upper, middle, lower])["constructions"]
         by_id = {item["construction_id"]: item for item in result}
-        middle_transfer = next(load for load in by_id["MIDDLE"]["loads"]
-                               if load["source_type"] == "transferred_high_hook_load")
-        upper_transfer = next(load for load in by_id["UPPER"]["loads"]
-                              if load["source_type"] == "transferred_high_hook_load")
-        self.assertAlmostEqual(middle_transfer["mass_kg"], 60.0)
-        self.assertAlmostEqual(upper_transfer["mass_kg"], 40.0)
+        self.assertFalse(any(load["source_type"] == "transferred_high_hook_load"
+                             for load in by_id["MIDDLE"]["loads"]))
+        self.assertFalse(any(load["source_type"] == "transferred_high_hook_load"
+                             for load in by_id["UPPER"]["loads"]))
+        self.assertIn("upstream_load_transfer_ineligible:LOWER",
+                      by_id["MIDDLE"]["issues"])
 
 
 if __name__ == "__main__":

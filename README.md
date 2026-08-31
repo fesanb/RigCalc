@@ -231,8 +231,11 @@ selected. The corotational solver is diagnostic-only until it implements the
 same tension-only hoist support model as the linear solver. Hoist supports that
 would require a negative reaction are released and the system is solved again;
 the original signed reaction remains in the report as uplift diagnostic data.
-Approved hoist reactions are written to the High Hook fields, and forces in
-structural Truss Cross connections are written back in newtons.
+High Hook writeback requires a validated physical tension-only contact model.
+The current implementation does not yet model chain slack, re-engagement and
+hoist/chain mass at contact, so every hoist-supported construction remains
+read-only even when its diagnostic reactions are well equilibrated. Forces in
+eligible structural Truss Cross connections are written back in newtons.
 
 The diagnostic corotational branch models distributed mass as a fixed global
 vertical gravity load based on the undeformed station geometry; it is not a

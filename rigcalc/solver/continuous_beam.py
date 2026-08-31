@@ -371,9 +371,18 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
             "method": "all_active_hoists_nonnegative",
             "candidate_sets_evaluated": 1,
         }
+    contact_mass_model_missing = any(
+        not item["is_structural_link"] for item in result["reactions"])
+    if contact_mass_model_missing:
+        # A fixed-point active set preserves a valuable signed diagnostic, but
+        # it is not the physical cable-contact solution until slack,
+        # re-engagement and hoist/chain mass are represented at contact.
+        result["issues"].append(
+            "tension_only_contact_mass_model_not_implemented")
     finalize_eligibility(
         result, support_model_valid=(not negative_hoists and
-                                     active_set_issue is None),
+                                     active_set_issue is None and
+                                     not contact_mass_model_missing),
         numerical_valid=(result["numerical_diagnostics"]
                          ["relative_reduced_residual"] <= 1.0e-8))
     released_count = sum(

@@ -87,7 +87,10 @@ class ContinuousBeamTests(unittest.TestCase):
         result = solve_continuous_beam(
             construction, trace_construction_loads(construction))
         self.assertEqual(result["status"], "preliminary")
-        self.assertTrue(result["writeback_eligible"])
+        self.assertFalse(result["writeback_eligible"])
+        self.assertFalse(result["validation"]["support_model_valid"])
+        self.assertIn("tension_only_contact_mass_model_not_implemented",
+                      result["issues"])
         self.assertEqual(
             result["active_set_validation"]["method"],
             "exhaustive_tension_only_active_set")
@@ -338,7 +341,7 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertAlmostEqual(sum(
             reaction["reaction_mass_kg"]
             for reaction in result["reactions"]), 2000.0, places=4)
-        self.assertTrue(result["writeback_eligible"])
+        self.assertFalse(result["writeback_eligible"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
         self.assertAlmostEqual(
             result["validation"]["moment_equilibrium_error_kg_m"],
@@ -347,7 +350,7 @@ class ContinuousBeamTests(unittest.TestCase):
             result["validation"]["reaction_equilibrium_correction"]["method"],
             "two_active_support_static_equilibrium")
         report = make_calculation_text({"constructions": [result]})
-        self.assertIn("Validation: equilibrium=yes support model=yes", report)
+        self.assertIn("Validation: equilibrium=yes support model=no", report)
         self.assertIn("Numerical diagnostics: method=scaled_partial_pivoting",
                       report)
         self.assertIn("unconstrained signed reaction", report)

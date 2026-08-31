@@ -161,6 +161,14 @@ def solve_two_support_beam(construction, loads):
                 item["reaction_mass_kg"] < -1.0e-6 and
                 not item["is_structural_link"]
                 for item in result["reactions"])
+            if any(not item["is_structural_link"]
+                   for item in result["reactions"]):
+                # A signed result is still useful, but the product policy
+                # requires cable slack/re-engagement and contact mass before
+                # a hoist-supported model can authorize writeback or transfer.
+                support_model_valid = False
+                result["issues"].append(
+                    "tension_only_contact_mass_model_not_implemented")
             finalize_eligibility(
                 result, support_model_valid=support_model_valid)
     return result
