@@ -1,3 +1,6 @@
+from math import isfinite
+
+
 def safe_float(value, default=None):
     if value is None:
         return default
@@ -7,7 +10,8 @@ def safe_float(value, default=None):
             return default
         for unit in (" kg", "kg", " mm", "mm", " kN", "kN", " N", "N", "°"):
             text = text.replace(unit, "")
-        return float(text)
+        parsed = float(text)
+        return parsed if isfinite(parsed) else default
     except (TypeError, ValueError):
         return default
 
