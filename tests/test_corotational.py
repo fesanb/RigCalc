@@ -9,7 +9,8 @@ from rigcalc.solver.nonlinear_beam import calculate_corotational_reactions
 from rigcalc.model import DocumentModel
 from rigcalc.report.calculation_report import make_calculation_text
 from tests.test_continuous_beam import construction, section
-from rigcalc.model import Point3D
+from rigcalc.model import AttachedObject, Point3D, PointLoad
+from tests.test_continuous_beam import attachment
 
 
 class CorotationalTests(unittest.TestCase):
@@ -86,6 +87,21 @@ class CorotationalTests(unittest.TestCase):
         self.assertFalse(result["writeback_eligible"])
         self.assertIn("tension_only_contact_mass_model_not_implemented",
                       result["issues"])
+
+    def test_inclined_overhang_preserves_uplift_when_no_contact_state_is_feasible(self):
+        load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
+        item = construction(
+            10000, [2000, 8000], total_mass_kg=0,
+            point_loads=[AttachedObject(load, attachment(10000))])
+        item.truss_segments[0].end = Point3D(10000, 0, 5000)
+        result = solve_corotational_beam(
+            item, trace_construction_loads(item))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertFalse(result["writeback_eligible"])
+        self.assertIn("tension_only_active_set_no_feasible_solution",
+                      result["issues"])
+        self.assertLess(result["reactions"][0]["reaction_mass_kg"], 0.0)
+        self.assertGreater(result["reactions"][1]["reaction_mass_kg"], 0.0)
 
 
 if __name__ == "__main__":
