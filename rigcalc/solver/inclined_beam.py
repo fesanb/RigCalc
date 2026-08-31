@@ -1,7 +1,8 @@
 """Diagnostic linear frame adapter for straight inclined truss chains."""
 
 from .beam_statics import _reaction_record
-from .continuous_beam import GRAVITY_M_S2, STATION_TOLERANCE_MM, _section_at
+from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
+                              STATION_TOLERANCE_MM, _section_at)
 from .frame3d import (FrameElement, FrameModel, FrameNode, element_axes,
                       global_uniform_load_to_local, solve_frame)
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
@@ -67,6 +68,7 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
         solved = solve_frame(FrameModel(nodes, elements))
     except ValueError as error:
         result["issues"].append(str(error)); return result
+    result["numerical_diagnostics"] = solved["numerical_diagnostics"]
     for support in supports:
         node = next(node for node, station in zip(nodes, stations) if abs(station-support.attachment.global_station_mm) <= STATION_TOLERANCE_MM)
         result["reactions"].append(_reaction_record(support, solved["node_reactions"][node.id][2]/GRAVITY_M_S2))
@@ -74,7 +76,7 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
         _signed_reactions = [dict(item) for item in result["reactions"]]
     if _active_ids is None:
         hoists = [item for item in all_supports if not item.item.is_structural_link]
-        if len(hoists) <= 8:
+        if len(hoists) <= MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS:
             valid = []
             for size in range(len(hoists)+1):
                 for chosen in combinations(hoists, size):
@@ -111,6 +113,13 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
             for reaction in result["reactions"]:
                 reaction["support_active"] = True
                 reaction["unconstrained_reaction_mass_kg"] = reaction["reaction_mass_kg"]
+        else:
+            result["active_set_validation"] = {
+                "method": "not_enumerated_inclined_tension_only_active_set",
+                "maximum_exhaustive_hoists": MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
+                "hoist_count": len(hoists),
+            }
+            result["issues"].append("tension_only_active_set_limit_exceeded")
     result["stations"] = [{"node_id": node.id, "station_mm": station,
                            "displacements": dict(zip(("ux_m", "uy_m", "uz_m", "rx_rad", "ry_rad", "rz_rad"), solved["node_displacements"][node.id]))}
                           for node, station in zip(nodes, stations)]
@@ -126,7 +135,9 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
         "moment_equilibrium_error_kg_m": reaction_moment-applied_moment,
         "moment_equilibrium_ok": abs(reaction_moment-applied_moment) <= 0.01,
         "support_model_valid": False,
-        "numerically_valid": True,
+        "numerically_valid": (
+            result["numerical_diagnostics"]["relative_reduced_residual"]
+            <= 1.0e-8),
         "load_model_valid": True,
     }
     result["deflection"] = build_deflection_summary(

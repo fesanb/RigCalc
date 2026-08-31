@@ -240,6 +240,9 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertEqual(result["status"], "diagnostic")
         self.assertAlmostEqual(sum(value["reaction_mass_kg"]
                                    for value in result["reactions"]), 100.0)
+        self.assertLess(
+            result["numerical_diagnostics"]["relative_reduced_residual"],
+            1.0e-8)
 
     def test_inclined_frame_asymmetric_point_load_matches_global_statics(self):
         load = PointLoad("P", "", Point3D(600, 0, 800), "Load", 100)
