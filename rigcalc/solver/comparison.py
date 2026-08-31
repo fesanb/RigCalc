@@ -64,6 +64,10 @@ def select_primary_calculation(linear, nonlinear):
                 "moment_equilibrium_ok", True) and
             nonlinear_item.get("validation", {}).get(
                 "support_model_valid", False) and
+            nonlinear_item.get("validation", {}).get(
+                "numerically_valid", False) and
+            nonlinear_item.get("validation", {}).get(
+                "load_model_valid", False) and
             nonlinear_item.get("writeback_eligible", False) and
             not any(issue.startswith("upstream_nonlinear_")
                     for issue in nonlinear_item.get("issues", [])))

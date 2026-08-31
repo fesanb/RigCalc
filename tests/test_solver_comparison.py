@@ -19,7 +19,11 @@ class SolverComparisonTests(unittest.TestCase):
         nonlinear = {"constructions": [{
             "construction_id": "C", "status": "diagnostic",
             "converged": converged,
-            "validation": {"vertical_equilibrium_ok": converged},
+            "validation": {
+                "vertical_equilibrium_ok": converged,
+                "numerically_valid": converged,
+                "load_model_valid": converged,
+            },
             "issues": [], "stations": [],
             "reactions": [reaction("A", 11), reaction("B", 18),
                           reaction("C", 31)],
@@ -51,6 +55,16 @@ class SolverComparisonTests(unittest.TestCase):
         linear, nonlinear = self.calculations(False)
         item = select_primary_calculation(linear, nonlinear)["constructions"][0]
         self.assertEqual(item["primary_solver"], "linear")
+
+    def test_missing_explicit_numerical_or_load_validation_falls_back(self):
+        for key in ("numerically_valid", "load_model_valid"):
+            linear, nonlinear = self.calculations()
+            nonlinear["constructions"][0]["writeback_eligible"] = True
+            nonlinear["constructions"][0]["validation"]["support_model_valid"] = True
+            del nonlinear["constructions"][0]["validation"][key]
+            item = select_primary_calculation(
+                linear, nonlinear)["constructions"][0]
+            self.assertEqual(item["primary_solver"], "linear")
 
 
 if __name__ == "__main__":
