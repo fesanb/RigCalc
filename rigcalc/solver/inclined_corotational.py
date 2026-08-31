@@ -1,0 +1,234 @@
+"""Diagnostic corotational adapter for a straight inclined planar chain.
+
+The adapter deliberately remains diagnostic-only: it explores fixed support
+contact states but does not yet apply hoist/chain contact mass or model cable
+slack/re-engagement as deformable unilateral elements.
+"""
+
+from itertools import combinations
+from math import sqrt
+
+from .beam_statics import _reaction_record
+from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
+                              STATION_TOLERANCE_MM, _section_at)
+from .corotational import (CorotationalElement, CorotationalModel,
+                           CorotationalNode, solve_corotational)
+from .deflection import build_deflection_summary, support_span_midpoints
+from .inclined_geometry import inclined_station_coordinates, planar_coordinate
+
+
+def _stations(coordinates, all_supports, active_supports, loads):
+    values = (set(coordinates) |
+              {item.attachment.global_station_mm for item in all_supports} |
+              set(support_span_midpoints(
+                  [item.attachment.global_station_mm for item in active_supports])) |
+              {item["station_mm"] for item in loads})
+    for load in loads:
+        if "interval_start_mm" in load:
+            values.add(load["interval_start_mm"])
+            values.add(load["interval_end_mm"])
+    return sorted(values)
+
+
+def _node_loads(stations, nodes, loads):
+    loads_by_station = [[0.0, 0.0, 0.0] for _ in stations]
+    for index, station in enumerate(stations):
+        loads_by_station[index][1] -= sum(
+            item["mass_kg"]*GRAVITY_M_S2 for item in loads
+            if "interval_start_mm" not in item and
+            abs(item["station_mm"]-station) <= STATION_TOLERANCE_MM)
+    for index, (start, end) in enumerate(zip(stations, stations[1:])):
+        length = sqrt((nodes[index+1][0]-nodes[index][0])**2 +
+                      (nodes[index+1][1]-nodes[index][1])**2)
+        if length <= 0.0:
+            continue
+        mass = 0.0
+        for item in loads:
+            if "interval_start_mm" not in item:
+                continue
+            if (start >= item["interval_start_mm"]-STATION_TOLERANCE_MM and
+                    end <= item["interval_end_mm"]+STATION_TOLERANCE_MM):
+                total_length = 0.0
+                for inner, (first, last) in enumerate(zip(stations, stations[1:])):
+                    if (first >= item["interval_start_mm"]-STATION_TOLERANCE_MM and
+                            last <= item["interval_end_mm"]+STATION_TOLERANCE_MM):
+                        total_length += sqrt(
+                            (nodes[inner+1][0]-nodes[inner][0])**2 +
+                            (nodes[inner+1][1]-nodes[inner][1])**2)
+                if total_length > 0.0:
+                    mass += item["mass_kg"]*length/total_length
+        if mass <= 0.0:
+            continue
+        # Fixed global vertical gravity resolved into the element's transverse
+        # direction.  Axial gravity has no fixed-end moment; the transverse
+        # part has the standard Euler-Bernoulli end moments.
+        horizontal = (nodes[index+1][0]-nodes[index][0])/length
+        force_n = mass*GRAVITY_M_S2
+        loads_by_station[index][1] -= force_n/2.0
+        loads_by_station[index+1][1] -= force_n/2.0
+        q_transverse = -force_n/length*horizontal
+        loads_by_station[index][2] += -q_transverse*length**2/12.0
+        loads_by_station[index+1][2] += q_transverse*length**2/12.0
+    return loads_by_station
+
+
+def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
+                                     _signed_reactions=None):
+    all_supports = sorted(
+        (item for item in construction.supports
+         if item.attachment.global_station_mm is not None),
+        key=lambda item: item.attachment.global_station_mm)
+    supports = [item for item in all_supports
+                if _active_ids is None or item.item.id in _active_ids]
+    result = {
+        "construction_id": construction.id,
+        "construction_name": construction.label,
+        "status": "not_calculated",
+        "method": "inclined_planar_corotational_diagnostic",
+        "loads": loads,
+        "load_model": {
+            "direction": "fixed_global_negative_z",
+            "reference_configuration": "undeformed_inclined_chord_geometry",
+            "distributed_load": "equivalent_nodal_gravity_load_not_follower",
+        },
+        "writeback_eligible": False,
+        "load_transfer_eligible": False,
+        "total_applied_mass_kg": sum(item["mass_kg"] for item in loads),
+        "reactions": [], "stations": [], "element_forces": [], "issues": [],
+    }
+    coordinates, issue = inclined_station_coordinates(construction)
+    if issue:
+        result["issues"].append(issue)
+        return result
+    if len(supports) < 2 or not loads:
+        result["issues"].append("requires_two_or_more_distinct_supports")
+        return result
+    stations = _stations(coordinates, all_supports, supports, loads)
+    points = [planar_coordinate(station, coordinates) for station in stations]
+    if any(x is None or z is None for x, z in points):
+        result["issues"].append("unsupported_partial_inclined_station")
+        return result
+    active_stations = {round(item.attachment.global_station_mm, 6)
+                       for item in supports}
+    anchor = min(active_stations)
+    node_loads = _node_loads(stations, points, loads)
+    nodes = [CorotationalNode(
+        "N{:04d}".format(index), x/1000.0, z/1000.0,
+        restrained=(round(station, 6) == anchor,
+                    round(station, 6) in active_stations, False),
+        load=tuple(node_loads[index]))
+        for index, (station, (x, z)) in enumerate(zip(stations, points))]
+    elements = []
+    for index, (start, end) in enumerate(zip(stations, stations[1:])):
+        section = _section_at(construction, (start+end)/2.0)
+        if section is None:
+            result["issues"].append(
+                "mechanical_section_missing_at_{:.3f}_mm".format((start+end)/2.0))
+            return result
+        required = (section.elastic_modulus_pa, section.area_m2, section.iyy_m4)
+        if any(value is None or value <= 0.0 for value in required):
+            result["issues"].append(
+                "mechanical_section_incomplete:{}".format(section.identifier))
+            return result
+        elements.append(CorotationalElement(
+            "E{:04d}".format(index), nodes[index].id, nodes[index+1].id,
+            section.elastic_modulus_pa, section.area_m2, section.iyy_m4))
+    try:
+        solved = solve_corotational(CorotationalModel(nodes, elements))
+    except ValueError as error:
+        result["issues"].append(str(error))
+        return result
+    result.update({
+        "converged": solved["converged"],
+        "iterations": solved["iterations"],
+        "completed_load_factor": solved["completed_load_factor"],
+        "load_history": solved["load_history"],
+    })
+    for support in supports:
+        index = next(index for index, station in enumerate(stations)
+                     if abs(station-support.attachment.global_station_mm)
+                     <= STATION_TOLERANCE_MM)
+        result["reactions"].append(_reaction_record(
+            support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
+    if _signed_reactions is None:
+        _signed_reactions = [dict(item) for item in result["reactions"]]
+    if _active_ids is None:
+        hoists = [item for item in all_supports if not item.item.is_structural_link]
+        if len(hoists) <= MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS:
+            candidates = []
+            for count in range(len(hoists)+1):
+                for selected in combinations(hoists, count):
+                    active_ids = ({item.item.id for item in selected} |
+                                  {item.item.id for item in all_supports
+                                   if item.item.is_structural_link})
+                    if len(active_ids) < 2:
+                        continue
+                    candidate = solve_inclined_corotational_beam(
+                        construction, loads, active_ids, _signed_reactions)
+                    if (candidate["status"] != "diagnostic" or
+                            not candidate.get("converged") or
+                            any(item["reaction_mass_kg"] < -1.0e-6
+                                for item in candidate["reactions"])):
+                        continue
+                    displacement = {round(item["station_mm"], 6):
+                                    item["displacements"]["uz_m"]
+                                    for item in candidate["stations"]}
+                    if any(displacement.get(round(item.attachment.global_station_mm, 6),
+                                            float("inf")) > 1.0e-8
+                           for item in hoists if item.item.id not in active_ids):
+                        continue
+                    candidates.append(candidate)
+            if candidates:
+                result = max(candidates, key=lambda item: len(item["reactions"]))
+                active = {item["support_id"]: item for item in result["reactions"]}
+                signed = {item["support_id"]: item for item in _signed_reactions}
+                result["reactions"] = []
+                for support in all_supports:
+                    reaction = active.get(support.item.id,
+                                          _reaction_record(support, 0.0))
+                    reaction["support_active"] = support.item.id in active
+                    reaction["unconstrained_reaction_mass_kg"] = (
+                        signed.get(support.item.id, {}).get("reaction_mass_kg"))
+                    result["reactions"].append(reaction)
+                result["active_set_validation"] = {
+                    "method": "exhaustive_inclined_corotational_contact_state",
+                    "candidate_sets_valid": len(candidates),
+                }
+                return result
+            result["issues"].append("tension_only_active_set_no_feasible_solution")
+        else:
+            result["issues"].append("tension_only_active_set_limit_exceeded")
+    result["stations"] = [{
+        "node_id": node.id, "station_mm": station,
+        "displacements": dict(zip(
+            ("ux_m", "uy_m", "uz_m", "rx_rad", "ry_rad", "rz_rad"),
+            (solved["node_displacements"][node.id][0], 0.0,
+             solved["node_displacements"][node.id][1], 0.0,
+             solved["node_displacements"][node.id][2], 0.0))),
+    } for node, station in zip(nodes, stations)]
+    reaction_total = sum(item["reaction_mass_kg"] for item in result["reactions"])
+    applied_moment = sum(item["mass_kg"]*planar_coordinate(
+        item["station_mm"], coordinates)[0]/1000.0 for item in loads)
+    reaction_moment = sum(item["reaction_mass_kg"]*planar_coordinate(
+        item["station_mm"], coordinates)[0]/1000.0
+                          for item in result["reactions"])
+    result["validation"] = {
+        "vertical_equilibrium_error_kg": reaction_total-result["total_applied_mass_kg"],
+        "vertical_equilibrium_ok": abs(
+            reaction_total-result["total_applied_mass_kg"]) <= 0.01,
+        "moment_equilibrium_error_kg_m": reaction_moment-applied_moment,
+        "moment_equilibrium_ok": abs(reaction_moment-applied_moment) <= 0.01,
+        "support_model_valid": False,
+        "numerically_valid": bool(solved["converged"]),
+        "load_model_valid": True,
+    }
+    result["deflection"] = build_deflection_summary(
+        result["stations"],
+        [item.attachment.global_station_mm for item in supports])
+    result["element_forces"] = solved["element_results"]
+    result["status"] = "diagnostic" if solved["converged"] else "not_calculated"
+    if not solved["converged"]:
+        result["issues"].append("nonlinear_solution_did_not_converge")
+    result["issues"].append("diagnostic_not_writeback_source")
+    result["issues"].append("tension_only_contact_mass_model_not_implemented")
+    return result

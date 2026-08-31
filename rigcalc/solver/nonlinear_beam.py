@@ -36,8 +36,11 @@ def solve_corotational_beam(construction, loads, progress=None):
         [item.attachment.global_station_mm for item in supports])
     geometry_issue = planar_beam_geometry_issue(construction)
     if geometry_issue:
-        result["issues"].append(geometry_issue)
-        return result
+        # Straight inclined chains use a dedicated corotational diagnostic
+        # adapter. Other geometry failures remain explicit in that adapter.
+        from .inclined_corotational import solve_inclined_corotational_beam
+        return solve_inclined_corotational_beam(
+            construction, loads)
     if construction.stationing != "open_chain":
         result["issues"].append("requires_open_chain")
         return result

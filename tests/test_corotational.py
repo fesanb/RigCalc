@@ -9,6 +9,7 @@ from rigcalc.solver.nonlinear_beam import calculate_corotational_reactions
 from rigcalc.model import DocumentModel
 from rigcalc.report.calculation_report import make_calculation_text
 from tests.test_continuous_beam import construction, section
+from rigcalc.model import Point3D
 
 
 class CorotationalTests(unittest.TestCase):
@@ -71,6 +72,20 @@ class CorotationalTests(unittest.TestCase):
         self.assertIn(
             "upstream_nonlinear_load_transfer_ineligible:LOWER",
             by_id["UPPER"]["issues"])
+
+    def test_inclined_corotational_adapter_preserves_global_gravity(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        result = solve_corotational_beam(
+            item, trace_construction_loads(item))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertTrue(result["converged"])
+        self.assertAlmostEqual(sum(item["reaction_mass_kg"]
+                                   for item in result["reactions"]), 100.0,
+                               places=3)
+        self.assertFalse(result["writeback_eligible"])
+        self.assertIn("tension_only_contact_mass_model_not_implemented",
+                      result["issues"])
 
 
 if __name__ == "__main__":
