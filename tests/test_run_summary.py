@@ -28,6 +28,20 @@ class RunSummaryTests(unittest.TestCase):
         self.assertIn("Unhandled calculation objects: 1", text)
         self.assertIn("Status: REVIEW REQUIRED", text)
 
+    def test_counts_explicit_hoist_outcomes(self):
+        summary = build_run_summary(
+            DocumentModel(), [], {"constructions": []},
+            {"items": []}, {"items": []}, hoist_outcomes=[
+                {"status": "calculated"},
+                {"status": "diagnostic_only"},
+                {"status": "zero_not_calculated"},
+            ])
+        self.assertEqual(summary["hoist_outcomes"]["calculated"], 1)
+        self.assertEqual(summary["hoist_outcomes"]["diagnostic_only"], 1)
+        self.assertEqual(summary["hoist_outcomes"]["zero_not_calculated"], 1)
+        self.assertIn("Hoist outcomes — calculated: 1, diagnostic: 1, zero: 1",
+                      make_run_summary_text(summary))
+
     def test_counts_inclined_diagnostic_results_separately(self):
         primary = {"constructions": [{
             "construction_id": "C1", "status": "diagnostic",

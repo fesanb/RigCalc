@@ -3,8 +3,9 @@
 
 def build_run_summary(document, constructions, primary, writeback,
                       cross_writeback, hoist_id_assignment=None,
-                      notifications=None):
+                      notifications=None, hoist_outcomes=None):
     notifications = notifications or []
+    hoist_outcomes = hoist_outcomes or []
     calculated = [item for item in primary["constructions"]
                   if item.get("status") == "preliminary"]
     diagnostic = [item for item in primary["constructions"]
@@ -42,6 +43,15 @@ def build_run_summary(document, constructions, primary, writeback,
                 "existing_count", 0),
             "assigned": (hoist_id_assignment or {}).get(
                 "assigned_count", 0),
+        },
+        "hoist_outcomes": {
+            "calculated": sum(item.get("status") == "calculated"
+                              for item in hoist_outcomes),
+            "diagnostic_only": sum(item.get("status") == "diagnostic_only"
+                                   for item in hoist_outcomes),
+            "zero_not_calculated": sum(
+                item.get("status") == "zero_not_calculated"
+                for item in hoist_outcomes),
         },
         "found": {
             "constructions": len(constructions),
@@ -118,6 +128,7 @@ def make_run_summary_text(summary):
     unhandled = summary["unhandled_calculation_objects"]
     ignored = summary["ignored_irrelevant_plugin_objects"]
     hoist_ids = summary.get("hoist_ids", {})
+    hoist_outcomes = summary.get("hoist_outcomes", {})
     notifications = summary.get("notifications", {})
     status = "REVIEW REQUIRED" if (
         errors["count"] or uncalculated.get("count", 0) or
@@ -140,6 +151,7 @@ def make_run_summary_text(summary):
         "Linear primary results: {}\n"
         "Corotational primary results: {}\n"
         "Hoist results written: {}\n"
+        "Hoist outcomes — calculated: {}, diagnostic: {}, zero: {}\n"
         "Truss Cross results written: {}\n"
         "Released hoist supports: {}\n\n"
         "--- REVIEW -------------------------------\n"
@@ -162,6 +174,9 @@ def make_run_summary_text(summary):
         found["truss_crosses"], calculated["constructions"],
         found["constructions"], calculated["linear_primary"],
         calculated["corotational_primary"], calculated["written_motors"],
+        hoist_outcomes.get("calculated", 0),
+        hoist_outcomes.get("diagnostic_only", 0),
+        hoist_outcomes.get("zero_not_calculated", 0),
         calculated["written_truss_crosses"],
         calculated["released_motor_supports"],
         notifications.get("load_errors", 0),

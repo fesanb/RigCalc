@@ -211,7 +211,7 @@ def write_reports(vs, document, constructions, inventory=None,
     summary = build_run_summary(
         document, constructions, primary, writeback, cross_writeback,
         hoist_id_assignment=hoist_id_assignment,
-        notifications=notifications)
+        notifications=notifications, hoist_outcomes=hoist_outcomes)
     with open(os.path.join(output_dir, "rigcalc_run_summary.json"),
               "w", encoding="utf-8") as stream:
         json.dump(summary, stream, ensure_ascii=False, indent=2)

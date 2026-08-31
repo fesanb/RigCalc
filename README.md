@@ -135,6 +135,8 @@ RigCalc/output/rigcalc_solver_comparison.json
 RigCalc/output/rigcalc_primary_calculation.txt
 RigCalc/output/rigcalc_primary_calculation.json
 RigCalc/output/rigcalc_hoist_ids.json
+RigCalc/output/rigcalc_hoist_outcomes.txt
+RigCalc/output/rigcalc_hoist_outcomes.json
 RigCalc/output/rigcalc_writeback.json
 RigCalc/output/rigcalc_truss_cross_writeback.json
 RigCalc/output/rigcalc_notifications.json
@@ -231,6 +233,12 @@ would require a negative reaction are released and the system is solved again;
 the original signed reaction remains in the report as uplift diagnostic data.
 Approved hoist reactions are written to the High Hook fields, and forces in
 structural Truss Cross connections are written back in newtons.
+
+Every discovered hoist also appears in `rigcalc_hoist_outcomes`. A supported,
+validated result is marked `calculated`; a visible but writeback-blocked result
+is `diagnostic_only`; and an unresolvable hoist is reported as `0.00 kN` with
+its precise association or model reason. Zero outcomes are diagnostic markers,
+not approved Vectorworks writeback values.
 
 Writeback happens automatically during a normal run. Work in a copy or a
 version-controlled Vectorworks document when validating new datasets.
