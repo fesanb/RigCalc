@@ -5,7 +5,8 @@ from rigcalc.notifications import (evaluate_deflections,
                                    evaluate_hoist_overloads,
                                    evaluate_internal_forces,
                                    evaluate_support_model_failures)
-from rigcalc.vw.notifications import write_notification_markers
+from rigcalc.vw.notifications import (_stacked_marker_position,
+                                      write_notification_markers)
 
 
 def reaction(load, capacity, support_id="H1", kind="hoist"):
@@ -160,6 +161,12 @@ class FloatActiveClassVS(NumericActiveClassVS):
 
 
 class NotificationWriterTests(unittest.TestCase):
+    def test_colocated_markers_have_deterministic_grid_positions(self):
+        position = (100.0, 200.0)
+        self.assertEqual(_stacked_marker_position(position, 0), (600.0, 700.0))
+        self.assertEqual(_stacked_marker_position(position, 1), (1100.0, 700.0))
+        self.assertEqual(_stacked_marker_position(position, 2), (600.0, 1200.0))
+
     def test_reconciles_owned_markers_and_preserves_user_objects(self):
         vs = FakeVS()
         document = DocumentModel(supports=[Support(

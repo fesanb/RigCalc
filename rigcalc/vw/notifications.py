@@ -8,6 +8,7 @@ from rigcalc.notifications import (DEFLECTION_NOTIFICATION_CLASS,
 BASE_CLASS = "RigCalc"
 OBJECT_NAME_PREFIX = "__RigCalcNotification__"
 MARKER_OFFSET_MM = 500.0
+MARKER_STACK_STEP_MM = 500.0
 RED = (52428, 0, 0)
 ORANGE = (65535, 32768, 0)
 BLUE = (0, 19660, 52428)
@@ -127,6 +128,14 @@ def _notification_position(document, constructions, notification):
     return None, None
 
 
+def _stacked_marker_position(position, index):
+    """Return a stable grid offset for markers sharing one source point."""
+    column = index % 2
+    row = index // 2
+    return (position[0] + MARKER_OFFSET_MM + column*MARKER_STACK_STEP_MM,
+            position[1] + MARKER_OFFSET_MM + row*MARKER_STACK_STEP_MM)
+
+
 def write_notification_markers(vs, document, constructions, notifications):
     """Replace only markers explicitly named as RigCalc-owned objects."""
     _ensure_classes(vs)
@@ -135,13 +144,28 @@ def write_notification_markers(vs, document, constructions, notifications):
     vs.NameUndoEvent("RigCalc notifications")
     for handle in old_markers:
         vs.DelObject(handle)
+    located = []
     for notification in notifications:
         position, source_ref = _notification_position(
             document, constructions, notification)
         if position is None:
             continue
-        x = position[0] + MARKER_OFFSET_MM
-        y = position[1] + MARKER_OFFSET_MM
+        located.append((notification, position, source_ref))
+    # Sorting by the stable notification identifier keeps a crowded location
+    # from jumping between runs merely because solver traversal order changes.
+    grouped = {}
+    for notification, position, source_ref in located:
+        key = (round(position[0], 6), round(position[1], 6))
+        grouped.setdefault(key, []).append((notification, position, source_ref))
+    ordered = []
+    for group in grouped.values():
+        ordered.extend(sorted(group, key=lambda item: item[0]["id"]))
+    for notification, position, source_ref in ordered:
+        key = (round(position[0], 6), round(position[1], 6))
+        group = grouped[key]
+        stack_index = sorted(
+            item[0]["id"] for item in group).index(notification["id"])
+        x, y = _stacked_marker_position(position, stack_index)
         vs.TextOrigin(x, y)
         vs.CreateText(notification["message"])
         handle = vs.LNewObj()
