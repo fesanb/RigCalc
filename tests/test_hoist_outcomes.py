@@ -1,6 +1,7 @@
 import unittest
 
-from rigcalc.model import DocumentModel, Point3D, Support
+from rigcalc.model import (AttachedObject, Attachment, Construction,
+                           DocumentModel, Point3D, Support)
 from rigcalc.notifications import evaluate_zero_hoist_outcomes
 from rigcalc.report.hoist_outcomes import (build_hoist_outcomes,
                                            make_hoist_outcomes_text)
@@ -38,6 +39,24 @@ class HoistOutcomeTests(unittest.TestCase):
         self.assertEqual(outcome["status"], "diagnostic_only")
         self.assertAlmostEqual(outcome["reaction_mass_kg"], 100.0)
         self.assertEqual(evaluate_zero_hoist_outcomes([outcome]), [])
+
+    def test_attached_unsolved_hoist_reports_solver_reason_and_evidence(self):
+        hoist = Support("H1", "Hoist", Point3D(1, 2), hoist_id="M01")
+        attached = AttachedObject(hoist, Attachment(
+            "T1", "Truss", 12.0, 100.0, 100.0, 1.0, 2.0,
+            method="geometry_3d_support", confidence="INFERRED",
+            carrier_clearance_mm=4.0))
+        construction = Construction("C1", [], [], "branched",
+                                    supports=[attached])
+        outcome = build_hoist_outcomes(
+            DocumentModel(supports=[hoist]), {"constructions": [{
+                "construction_id": "C1", "status": "not_calculated",
+                "issues": ["requires_branched_or_loop_solver"],
+                "reactions": [],
+            }]}, topology_constructions=[construction])[0]
+        self.assertEqual(outcome["status"], "zero_not_calculated")
+        self.assertEqual(outcome["reason"], "requires_branched_or_loop_solver")
+        self.assertEqual(outcome["association_evidence"]["truss_id"], "T1")
 
 
 if __name__ == "__main__":

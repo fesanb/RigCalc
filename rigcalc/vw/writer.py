@@ -170,7 +170,8 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(os.path.join(output_dir, "rigcalc_primary_calculation.txt"),
               "w", encoding="utf-8") as stream:
         stream.write(make_calculation_text(primary))
-    hoist_outcomes = build_hoist_outcomes(document, primary)
+    hoist_outcomes = build_hoist_outcomes(
+        document, primary, topology_constructions=constructions)
     with open(os.path.join(output_dir, "rigcalc_hoist_outcomes.json"),
               "w", encoding="utf-8") as stream:
         json.dump({"hoist_outcomes": hoist_outcomes}, stream,
