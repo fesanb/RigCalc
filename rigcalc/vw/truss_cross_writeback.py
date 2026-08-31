@@ -1,5 +1,7 @@
 """Verified force writeback for BrxCustomTrussCross structural links."""
 
+from math import isfinite
+
 from .hoist_fields import STANDARD_GRAVITY_M_S2
 from .records import get_parametric_info, safe_float
 
@@ -21,11 +23,13 @@ def _write_candidates(document, calculation):
             link = links.get(reaction["support_id"])
             if link is None or link.source_ref is None:
                 continue
+            mass_kg = reaction.get("reaction_mass_kg")
+            if not isinstance(mass_kg, (int, float)) or not isfinite(mass_kg):
+                continue
             result.append({
                 "construction_id": construction["construction_id"],
                 "link": link,
-                "force_n": (reaction["reaction_mass_kg"] *
-                            STANDARD_GRAVITY_M_S2),
+                "force_n": mass_kg * STANDARD_GRAVITY_M_S2,
             })
     return result
 

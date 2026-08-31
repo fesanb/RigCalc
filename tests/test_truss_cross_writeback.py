@@ -58,6 +58,16 @@ class TrussCrossWritebackTests(unittest.TestCase):
             vs, self.document(), self.calculation(), confirm=False)
         self.assertEqual(result["status"], "written")
 
+    def test_nonfinite_force_source_is_not_written(self):
+        for mass in (float("nan"), float("inf"), float("-inf")):
+            vs = FakeVS()
+            calculation = self.calculation()
+            calculation["constructions"][0]["reactions"][0][
+                "reaction_mass_kg"] = mass
+            result = write_truss_cross_forces(vs, self.document(), calculation)
+            self.assertEqual(result["status"], "nothing_to_write")
+            self.assertEqual(vs.fields["Force"], "0")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,7 @@
 """Confirmed writeback of calculated High Hook values to BrxHoist objects."""
 
+from math import isfinite
+
 from .hoist_fields import (HIGH_HOOK_FORCE_FIELD, HIGH_HOOK_WEIGHT_FIELD,
                            high_hook_field_values)
 from .records import get_parametric_info, safe_float
@@ -18,10 +20,14 @@ def _write_candidates(document, calculation):
             support = supports.get(reaction["support_id"])
             if support is None or support.source_ref is None:
                 continue
+            mass_kg = reaction.get("preliminary_high_hook_mass_kg")
+            if (not isinstance(mass_kg, (int, float)) or
+                    not isfinite(mass_kg) or mass_kg < 0.0):
+                continue
             candidates.append({
                 "construction_id": construction["construction_id"],
                 "support": support,
-                "mass_kg": reaction["preliminary_high_hook_mass_kg"],
+                "mass_kg": mass_kg,
             })
     return candidates
 

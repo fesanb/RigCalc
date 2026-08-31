@@ -81,6 +81,18 @@ class HoistWritebackTests(unittest.TestCase):
         self.assertEqual(result["status"], "nothing_to_write")
         self.assertEqual(vs.fields["ReactionForceWeight"], "0")
 
+    def test_invalid_high_hook_mass_is_not_written(self):
+        for mass in (-1.0, float("nan"), float("inf")):
+            vs = FakeVS()
+            calculation = self.calculation()
+            calculation["constructions"][0]["reactions"][0][
+                "preliminary_high_hook_mass_kg"] = mass
+            result = write_high_hook_values(vs, DocumentModel(supports=[
+                Support("H1", "Hoist", Point3D(0, 0), source_ref="handle")]),
+                calculation)
+            self.assertEqual(result["status"], "nothing_to_write")
+            self.assertEqual(vs.fields["ReactionForceWeight"], "0")
+
 
 if __name__ == "__main__":
     unittest.main()
