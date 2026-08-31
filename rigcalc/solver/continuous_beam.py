@@ -9,14 +9,18 @@ released and the model is solved again. Structural links remain bilateral.
 This remains a first-order vertical model, not the later geometric model.
 """
 
-from .beam_statics import _reaction_record
+from itertools import combinations
+
+from .beam_statics import _reaction_record, planar_beam_geometry_issue
 from .deflection import (build_deflection_summary,
                          support_span_midpoints)
 from .frame3d import FrameElement, FrameModel, FrameNode, solve_frame
+from .validation import finalize_eligibility
 
 
 GRAVITY_M_S2 = 9.80665
 STATION_TOLERANCE_MM = 1.0e-6
+MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS = 8
 
 
 def _unique_stations(values):
@@ -60,8 +64,65 @@ def _section_result(section):
     }
 
 
+def _resolve_tension_only_active_set(construction, loads, signed_reactions):
+    """Find the complementarity-valid hoist set for a small support system.
+
+    A released cable must have non-positive vertical displacement (slack/down),
+    while every active cable must have a non-negative reaction.  Enumerating
+    the candidate sets avoids the unsafe assumption that a released support
+    can never become active again after load redistribution.
+    """
+    supports = [item for item in construction.supports
+                if item.attachment.global_station_mm is not None]
+    hoists = [item for item in supports if not item.item.is_structural_link]
+    if len(hoists) > MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS:
+        return None
+    structural_ids = {item.item.id for item in supports
+                      if item.item.is_structural_link}
+    candidates, evaluated = [], 0
+    for count in range(len(hoists)+1):
+        for active_hoists in combinations(hoists, count):
+            active_ids = structural_ids | {item.item.id for item in active_hoists}
+            if len(active_ids) < 2:
+                continue
+            evaluated += 1
+            candidate = solve_continuous_beam(
+                construction, loads, _active_support_ids=active_ids,
+                _signed_reactions=signed_reactions,
+                _resolve_tension_only=False)
+            if candidate["status"] != "preliminary":
+                continue
+            reactions = {item["support_id"]: item
+                         for item in candidate["reactions"]}
+            active_valid = all(
+                reactions[item.item.id]["reaction_mass_kg"] >= -1.0e-6
+                for item in active_hoists)
+            displacements = {
+                round(item["station_mm"], 6): item["displacements"]["uz_m"]
+                for item in candidate["stations"]}
+            released_valid = all(
+                displacements.get(round(item.attachment.global_station_mm, 6),
+                                  float("inf")) <= 1.0e-8
+                for item in hoists if item not in active_hoists)
+            if active_valid and released_valid:
+                candidates.append((len(active_hoists), candidate))
+    if not candidates:
+        return None
+    # Prefer the valid contact set with the most engaged hoists. This is also
+    # deterministic in degenerate zero-reaction cases.
+    result = max(candidates, key=lambda item: item[0])[1]
+    result["active_set_validation"] = {
+        "method": "exhaustive_tension_only_active_set",
+        "candidate_sets_evaluated": evaluated,
+        "candidate_sets_valid": len(candidates),
+        "released_support_displacement_rule": "uz_m <= 1e-8",
+    }
+    return result
+
+
 def solve_continuous_beam(construction, loads, _active_support_ids=None,
-                          _signed_reactions=None):
+                          _signed_reactions=None,
+                          _resolve_tension_only=True):
     all_supports = sorted(
         (item for item in construction.supports
          if item.attachment.global_station_mm is not None),
@@ -75,6 +136,7 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         "status": "not_calculated",
         "method": None, "loads": loads,
         "writeback_eligible": False,
+        "load_transfer_eligible": False,
         "total_applied_mass_kg": sum(item["mass_kg"] for item in loads),
         "reactions": [], "stations": [], "element_forces": [],
         "node_displacements": {},
@@ -84,6 +146,10 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         [item.attachment.global_station_mm for item in all_supports])
     support_stations = _unique_stations(
         [item.attachment.global_station_mm for item in supports])
+    geometry_issue = planar_beam_geometry_issue(construction)
+    if geometry_issue:
+        result["issues"].append(geometry_issue)
+        return result
     if construction.stationing != "open_chain":
         result["issues"].append("requires_branched_or_loop_solver")
         return result
@@ -175,18 +241,24 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
             _reaction_record(support, reaction_n/GRAVITY_M_S2))
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
+    if _resolve_tension_only and _active_support_ids is None:
+        active_set_result = _resolve_tension_only_active_set(
+            construction, loads, _signed_reactions)
+        if active_set_result is not None:
+            return active_set_result
     negative_hoists = [
         item for item in result["reactions"]
         if item["reaction_mass_kg"] < -1.0e-6 and
         not item["is_structural_link"]]
-    if negative_hoists and len(supports) > 2:
+    if (_resolve_tension_only and negative_hoists and len(supports) > 2):
         released = min(
             negative_hoists, key=lambda item: item["reaction_mass_kg"])
         active_ids = {item.item.id for item in supports}
         active_ids.remove(released["support_id"])
         return solve_continuous_beam(
             construction, loads, _active_support_ids=active_ids,
-            _signed_reactions=_signed_reactions)
+            _signed_reactions=_signed_reactions,
+            _resolve_tension_only=True)
     active_reactions = {
         item["support_id"]: item for item in result["reactions"]}
 
@@ -288,17 +360,15 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
     result["deflection"] = build_deflection_summary(
         result["stations"], support_stations)
     result["status"] = "preliminary"
-    result["method"] = "linear_3d_frame_vertical_supports"
-    result["writeback_eligible"] = (
-        result["validation"]["vertical_equilibrium_ok"] and
-        result["validation"]["moment_equilibrium_ok"])
+    result["method"] = "linear_planar_continuous_beam_vertical_supports"
     if negative_hoists:
-        result["writeback_eligible"] = False
         result["issues"].append("tension_only_support_set_unresolved")
+    finalize_eligibility(
+        result, support_model_valid=not negative_hoists)
     released_count = sum(
         not item["support_active"] for item in result["reactions"])
     if released_count:
-        result["method"] = "linear_3d_frame_tension_only_hoists"
+        result["method"] = "linear_planar_continuous_beam_tension_only_hoists"
         result["active_support_count"] = len(all_supports)-released_count
         result["released_support_count"] = released_count
     result["issues"].append("first_order_vertical_support_model")

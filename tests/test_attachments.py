@@ -70,6 +70,21 @@ class AttachmentTests(unittest.TestCase):
         self.assertEqual(construction.supports, [])
         self.assertEqual(document.unassigned_supports, [support])
 
+    def test_unassigned_support_includes_missing_id_and_nearest_carrier_evidence(self):
+        truss = TrussSegment(
+            "T1", "", "Line", Point3D(0, 0, 5000), 3000,
+            Point3D(0, 0, 5000), Point3D(3000, 0, 5000))
+        support = Support("H1", "Hoist", Point3D(1500, 0, 0))
+        document = DocumentModel(trusses=[truss], supports=[support])
+        build_constructions(document)
+        diagnostic = document.unassigned_support_diagnostics["H1"]
+        self.assertTrue(diagnostic["missing_truss_system_identifier"])
+        self.assertEqual(diagnostic["reason"],
+                         "missing_explicit_truss_system_identifier")
+        self.assertEqual(diagnostic["nearest_plan"]["truss_id"], "T1")
+        self.assertAlmostEqual(
+            diagnostic["nearest_plan"]["carrier_clearance_mm"], 0.0)
+
     def test_explicit_uuid_resolves_inclined_truss_with_plan_geometry(self):
         start = Point3D(0, 0, 1000)
         end = Point3D(3000, 0, 5000)
@@ -97,6 +112,14 @@ class AttachmentTests(unittest.TestCase):
         attachment = build_constructions(document)[0].supports[0].attachment
         self.assertEqual(
             attachment.method, "unresolved_system_inclined_plan_geometry")
+        self.assertEqual(attachment.confidence, "INFERRED")
+
+    def test_missing_uuid_uses_unique_exact_inclined_plan_hit_as_inferred(self):
+        truss = TrussSegment("T1", "", "Line", Point3D(0, 0, 1000), 5000,
+                             Point3D(0, 0, 1000), Point3D(3000, 0, 5000))
+        support = Support("H1", "Hoist", Point3D(1500, 0, 0))
+        attachment = build_constructions(DocumentModel(trusses=[truss], supports=[support]))[0].supports[0].attachment
+        self.assertEqual(attachment.method, "missing_system_inclined_plan_geometry")
         self.assertEqual(attachment.confidence, "INFERRED")
 
     def test_stale_uuid_inclined_plan_crossing_remains_unassigned(self):

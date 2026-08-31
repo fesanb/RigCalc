@@ -33,6 +33,21 @@ def _class_exists(vs, name):
 
 def _ensure_classes(vs):
     old_class = vs.ActiveClass() if hasattr(vs, "ActiveClass") else None
+    # NameClass creates a class when its argument does not already exist.
+    # Vectorworks may return the active class as a numeric index (including a
+    # float-like bridge value), so resolve it *only* to a known class name
+    # before using NameClass to restore the active class.  This must fail
+    # closed: never feed an unverified value back into NameClass.
+    old_class_name = None
+    if isinstance(old_class, str) and _class_exists(vs, old_class):
+        old_class_name = old_class
+    else:
+        try:
+            candidate = vs.ClassList(int(old_class))
+            if candidate and _class_exists(vs, candidate):
+                old_class_name = candidate
+        except (TypeError, ValueError, OverflowError):
+            pass
     try:
         for name in (BASE_CLASS,) + NOTIFICATION_CLASSES:
             # GetObject does not reliably return a class definition in all
@@ -51,8 +66,8 @@ def _ensure_classes(vs):
                     vs.SetClOpacity(name, 100)
                     vs.SetClUseGraphic(name, True)
     finally:
-        if old_class:
-            vs.NameClass(old_class)
+        if old_class_name:
+            vs.NameClass(old_class_name)
 
 
 def _owned_marker_handles(vs):

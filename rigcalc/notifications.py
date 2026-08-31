@@ -156,7 +156,33 @@ def evaluate_internal_forces(calculation, tolerance_ratio=1.0e-6):
     return notifications
 
 
+def evaluate_support_model_failures(calculation):
+    """Expose blocked tension-only support models at the affected hoist."""
+    notifications = []
+    for construction in calculation.get("constructions", []):
+        if "tension_only_active_set_no_feasible_solution" not in construction.get("issues", []):
+            continue
+        negative = next((item for item in construction.get("reactions", [])
+                         if item.get("reaction_mass_kg", 0.0) < -1.0e-6),
+                        None)
+        support_id = str((negative or {}).get("support_id", ""))
+        hoist_id = str((negative or {}).get("support_hoist_id") or support_id)
+        construction_id = str(construction.get("construction_id", ""))
+        notifications.append({
+            "id": "support_model:{}".format(construction_id),
+            "type": "support_model_failure",
+            "severity": "error",
+            "class_name": LOAD_NOTIFICATION_CLASS,
+            "construction_id": construction_id,
+            "support_id": support_id,
+            "message": "SUPPORT MODEL\n{}\n{}: cable slack / uplift\nNo feasible tension-only solution".format(
+                construction_id, hoist_id or "support"),
+        })
+    return notifications
+
+
 def evaluate_notifications(calculation):
     return (evaluate_hoist_overloads(calculation) +
             evaluate_deflections(calculation) +
-            evaluate_internal_forces(calculation))
+            evaluate_internal_forces(calculation) +
+            evaluate_support_model_failures(calculation))

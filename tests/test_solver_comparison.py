@@ -32,13 +32,20 @@ class SolverComparisonTests(unittest.TestCase):
         self.assertEqual(
             result["constructions"][0]["reactions"][0]["difference_kg"], 1)
 
-    def test_validated_multi_support_nonlinear_result_becomes_primary(self):
+    def test_only_a_support_validated_nonlinear_result_becomes_primary(self):
         linear, nonlinear = self.calculations()
+        nonlinear["constructions"][0]["writeback_eligible"] = True
+        nonlinear["constructions"][0]["validation"]["support_model_valid"] = True
         selected = select_primary_calculation(linear, nonlinear)
         item = selected["constructions"][0]
         self.assertEqual(item["primary_solver"], "corotational")
         self.assertEqual(item["status"], "preliminary")
         self.assertTrue(item["writeback_eligible"])
+
+    def test_diagnostic_nonlinear_result_falls_back_to_linear(self):
+        linear, nonlinear = self.calculations()
+        item = select_primary_calculation(linear, nonlinear)["constructions"][0]
+        self.assertEqual(item["primary_solver"], "linear")
 
     def test_nonconverged_result_falls_back_to_linear(self):
         linear, nonlinear = self.calculations(False)

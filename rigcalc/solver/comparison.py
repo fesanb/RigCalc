@@ -62,7 +62,10 @@ def select_primary_calculation(linear, nonlinear):
                 "vertical_equilibrium_ok") and
             nonlinear_item.get("validation", {}).get(
                 "moment_equilibrium_ok", True) and
-            not any(issue.startswith("upstream_nonlinear_not_converged")
+            nonlinear_item.get("validation", {}).get(
+                "support_model_valid", False) and
+            nonlinear_item.get("writeback_eligible", False) and
+            not any(issue.startswith("upstream_nonlinear_")
                     for issue in nonlinear_item.get("issues", [])))
         item = deepcopy(nonlinear_item if use_nonlinear else linear_item)
         item["primary_solver"] = (

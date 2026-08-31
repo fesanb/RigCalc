@@ -7,9 +7,11 @@ def build_run_summary(document, constructions, primary, writeback,
     notifications = notifications or []
     calculated = [item for item in primary["constructions"]
                   if item.get("status") == "preliminary"]
+    diagnostic = [item for item in primary["constructions"]
+                  if item.get("status") == "diagnostic"]
     uncalculated_ids = {
         item["construction_id"] for item in primary["constructions"]
-        if item.get("status") != "preliminary"}
+        if item.get("status") not in ("preliminary", "diagnostic")}
     failed_ids = {
         item["construction_id"] for item in primary["constructions"]
         if (item.get("status") == "preliminary" and
@@ -67,6 +69,12 @@ def build_run_summary(document, constructions, primary, writeback,
             "written_truss_crosses": sum(
                 item.get("status") == "written"
                 for item in cross_writeback.get("items", [])),
+        },
+        "diagnostic": {
+            "constructions": len(diagnostic),
+            "inclined_planar_frames": sum(
+                item.get("method") == "inclined_planar_3d_frame_diagnostic"
+                for item in diagnostic),
         },
         "technical_errors": {
             "count": len(failed_ids)+len(writeback_failures),

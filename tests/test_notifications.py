@@ -3,7 +3,8 @@ import unittest
 from rigcalc.model import DocumentModel, Point3D, Support
 from rigcalc.notifications import (evaluate_deflections,
                                    evaluate_hoist_overloads,
-                                   evaluate_internal_forces)
+                                   evaluate_internal_forces,
+                                   evaluate_support_model_failures)
 from rigcalc.vw.notifications import write_notification_markers
 
 
@@ -72,6 +73,19 @@ class NotificationEvaluationTests(unittest.TestCase):
         self.assertIn("My 9.00/8.00 kNm", items[0]["message"])
         self.assertIn("Vz 11.00/10.00 kN", items[1]["message"])
 
+    def test_unilateral_support_failure_becomes_marker_at_negative_hoist(self):
+        value = calculation(reaction(120, 250, "H1"),
+                            reaction(-30, 250, "H2"))
+        value["constructions"][0].update({
+            "construction_id": "C-inclined", "status": "diagnostic",
+            "writeback_eligible": False,
+            "issues": ["tension_only_active_set_no_feasible_solution"],
+        })
+        items = evaluate_support_model_failures(value)
+        self.assertEqual(items[0]["support_id"], "H2")
+        self.assertEqual(items[0]["class_name"], "RigCalc-Load")
+        self.assertIn("cable slack / uplift", items[0]["message"])
+
 
 class FakeVS:
     def __init__(self):
@@ -134,6 +148,17 @@ class FakeVS:
         self.objects[handle]["boolean:{}".format(selector)] = value
 
 
+class NumericActiveClassVS(FakeVS):
+    """Mirror Vectorworks, where ActiveClass returns a class index."""
+    def ActiveClass(self):
+        return sorted(self.classes).index(self.active_class) + 1
+
+
+class FloatActiveClassVS(NumericActiveClassVS):
+    def ActiveClass(self):
+        return float(super().ActiveClass())
+
+
 class NotificationWriterTests(unittest.TestCase):
     def test_reconciles_owned_markers_and_preserves_user_objects(self):
         vs = FakeVS()
@@ -188,6 +213,18 @@ class NotificationWriterTests(unittest.TestCase):
         write_notification_markers(vs, document, [], [])
 
         self.assertEqual(vs.classes, classes_after_first_run)
+
+    def test_numeric_active_class_is_restored_by_name_without_numeric_classes(self):
+        vs = NumericActiveClassVS()
+        write_notification_markers(vs, DocumentModel(), [], [])
+        self.assertEqual(vs.active_class, "None")
+        self.assertFalse(any(name.isdigit() for name in vs.classes))
+
+    def test_float_active_class_does_not_create_numeric_classes(self):
+        vs = FloatActiveClassVS()
+        write_notification_markers(vs, DocumentModel(), [], [])
+        self.assertEqual(vs.active_class, "None")
+        self.assertFalse(any(name.isdigit() for name in vs.classes))
 
 
 if __name__ == "__main__":

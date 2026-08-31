@@ -6,8 +6,31 @@
 RigCalc reads rigging geometry from Vectorworks Spotlight, builds an
 inspectable Python model, and performs preliminary structural analysis of
 truss constructions. It calculates reactions, deflections, and internal
-forces with both a linear beam model and a corotational 3D model. Validated
-results can be written back to Hoist and Truss Cross objects in Vectorworks.
+forces with a linear vertical continuous-beam model. A corotational 2D model
+is also produced for diagnostic comparison, but is not an approved writeback
+source. Validated linear results can be written back to Hoist and Truss Cross
+objects in Vectorworks.
+
+## Product calculation policy
+
+RigCalc's product goal is to calculate every in-scope construction, regardless
+of geometry: level, inclined, vertical, curved, inverted, branched, closed, or
+true 3D. Current solver coverage is an implementation status, not a permanent
+scope exclusion. A geometry that is not yet physically solved must still be
+identified, diagnosed, and tracked to a concrete implementation issue.
+
+Geometry is the authoritative source for associating trusses, hoists, dead
+hangs, and loads. Vectorworks system links are useful evidence but are never a
+requirement: missing or stale links must fall back to measured geometry with
+recorded confidence and distance evidence.
+
+Underload, uplift, negative reactions, and signed deflections are important
+engineering diagnostics. RigCalc must preserve and report them, including the
+amount and affected location. A physically admissible tension-only solution
+must additionally account for chain slack, re-engagement, and hoist/chain
+mass; until available, writeback remains blocked but the diagnostic result is
+still reported. Every discovered hoist must receive either a calculated result
+or an explicit `0.00 kN` outcome with a clear drawing and report reason.
 
 > [!WARNING]
 > RigCalc is experimental software. Its results must not be used as the sole
@@ -196,11 +219,18 @@ trim fields. Dead-hang rigging weight comes from the Bridle object's dynamic
 `TotalWeight`, so changes made through Bridle Parts are reflected on the next
 scan without a RigCalc-specific parts table.
 
+The supported calculation scope is an open, collinear truss chain with vertical
+gravity loads and vertical supports. Branched or looped topology, lateral
+loads, torsion, corner blocks, and arbitrary 3D load paths are reported as
+unsupported rather than analysed by the beam solver.
+
 The linear and corotational analyses are compared before a primary result is
-selected. Non-converged nonlinear results are rejected. Hoist supports that
-would require a negative reaction are released and the system is solved
-again. Approved hoist reactions are written to the High Hook fields, and
-forces in structural Truss Cross connections are written back in newtons.
+selected. The corotational solver is diagnostic-only until it implements the
+same tension-only hoist support model as the linear solver. Hoist supports that
+would require a negative reaction are released and the system is solved again;
+the original signed reaction remains in the report as uplift diagnostic data.
+Approved hoist reactions are written to the High Hook fields, and forces in
+structural Truss Cross connections are written back in newtons.
 
 Writeback happens automatically during a normal run. Work in a copy or a
 version-controlled Vectorworks document when validating new datasets.

@@ -29,6 +29,15 @@ def make_calculation_text(data):
             "Primary solver: {}".format(item.get("primary_solver") or "-"),
             "Applied mass: {:.2f} kg".format(item["total_applied_mass_kg"]),
         ])
+        validation = item.get("validation", {})
+        if validation:
+            lines.append(
+                "Validation: equilibrium={} support model={} numerical={} "
+                "load model={}".format(
+                    "yes" if validation.get("equilibrium_valid") else "no",
+                    "yes" if validation.get("support_model_valid") else "no",
+                    "yes" if validation.get("numerically_valid") else "no",
+                    "yes" if validation.get("load_model_valid") else "no"))
         for reaction in item["reactions"]:
             support_state = (
                 " [released tension-only support]"
@@ -36,7 +45,7 @@ def make_calculation_text(data):
             support_label = reaction.get("support_hoist_id") or reaction["support_id"]
             if support_label != reaction["support_id"]:
                 support_label += " [{}]".format(reaction["support_id"])
-            lines.append(
+            reaction_line = (
                 "  {} at {:.3f} m: reaction {:.2f} kg + hoist/chain {:.2f} kg "
                 "= preliminary high hook {:.2f} kg (capacity {:.2f} kg){}".format(
                     support_label, reaction["station_mm"] / 1000.0,
@@ -46,6 +55,13 @@ def make_calculation_text(data):
                     reaction["capacity_kg"],
                     support_state,
                 ))
+            unconstrained = reaction.get("unconstrained_reaction_mass_kg")
+            if (unconstrained is not None and
+                    abs(unconstrained-reaction["reaction_mass_kg"]) > 1.0e-6):
+                reaction_line += (
+                    " [unconstrained signed reaction: {:+.2f} kg]".format(
+                        unconstrained))
+            lines.append(reaction_line)
         stations = item.get("stations", [])
         deflection = item.get("deflection", {})
         elements = item.get("element_forces", [])

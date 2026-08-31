@@ -1,6 +1,7 @@
 """Adapter from RigCalc constructions to the corotational 2D solver."""
 
-from .beam_statics import _reaction_record, trace_construction_loads
+from .beam_statics import (_reaction_record, planar_beam_geometry_issue,
+                           trace_construction_loads)
 from .continuous_beam import (GRAVITY_M_S2, STATION_TOLERANCE_MM,
                               _section_at, _section_result, _support_at,
                               _unique_stations)
@@ -8,6 +9,7 @@ from .deflection import (build_deflection_summary,
                          support_span_midpoints)
 from .corotational import (CorotationalElement, CorotationalModel,
                            CorotationalNode, solve_corotational)
+from .validation import finalize_eligibility
 
 
 def solve_corotational_beam(construction, loads, progress=None):
@@ -21,11 +23,16 @@ def solve_corotational_beam(construction, loads, progress=None):
         "status": "not_calculated",
         "method": "corotational_2d_frame", "loads": loads,
         "writeback_eligible": False,
+        "load_transfer_eligible": False,
         "total_applied_mass_kg": sum(item["mass_kg"] for item in loads),
         "reactions": [], "stations": [], "element_forces": [], "issues": [],
     }
     support_stations = _unique_stations(
         [item.attachment.global_station_mm for item in supports])
+    geometry_issue = planar_beam_geometry_issue(construction)
+    if geometry_issue:
+        result["issues"].append(geometry_issue)
+        return result
     if construction.stationing != "open_chain":
         result["issues"].append("requires_open_chain")
         return result
@@ -170,6 +177,11 @@ def solve_corotational_beam(construction, loads, progress=None):
     else:
         result["issues"].append("nonlinear_solution_did_not_converge")
     result["issues"].append("diagnostic_not_writeback_source")
+    # Vertical supports are bilateral in this solver. Its signed reactions
+    # remain useful diagnostics, but cannot certify a tension-only hoist model.
+    finalize_eligibility(
+        result, support_model_valid=False,
+        numerical_valid=solved["converged"], permit_writeback=False)
     return result
 
 
@@ -201,6 +213,11 @@ def calculate_corotational_reactions(document, constructions, progress=None):
             if not source.get("converged"):
                 upstream_failed.append(source_id)
                 continue
+            # The nonlinear model is diagnostic-only until it implements the
+            # same tension-only support physics as the linear model.
+            if not source.get("load_transfer_eligible", False):
+                upstream_failed.append(source_id)
+                continue
             for reaction in source["reactions"]:
                 if reaction["transfer_target_construction_id"] != construction_id:
                     continue
@@ -221,7 +238,8 @@ def calculate_corotational_reactions(document, constructions, progress=None):
             construction, loads, progress=callback)
         for source_id in upstream_failed:
             result["issues"].append(
-                "upstream_nonlinear_not_converged:{}".format(source_id))
+                "upstream_nonlinear_load_transfer_ineligible:{}".format(
+                    source_id))
         visiting.remove(construction_id)
         solved[construction_id] = result
         if progress:
@@ -235,7 +253,7 @@ def calculate_corotational_reactions(document, constructions, progress=None):
         "limitations": [
             "Two-dimensional corotational open-chain model",
             "Horizontal restraint is applied at the first lift point only",
-            "Load transfer requires converged upstream nonlinear results",
+            "Diagnostic nonlinear results are not propagated as loads",
         ],
         "constructions": [solved[item.id] for item in constructions],
     }

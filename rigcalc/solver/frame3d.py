@@ -134,6 +134,16 @@ def _matvec(matrix, vector):
     return [sum(a*b for a, b in zip(row, vector)) for row in matrix]
 
 
+def global_uniform_load_to_local(global_load_n_m, axes):
+    """Express a fixed global distributed load in an element's local axes.
+
+    Gravity remains vertical in world coordinates as the element is inclined;
+    it is not a follower load.  This helper is the load-model boundary used by
+    an inclined-frame adapter.
+    """
+    return tuple(_dot(global_load_n_m, axis) for axis in axes)
+
+
 def uniform_local_equivalent_load(load, length):
     qx, qy, qz = load
     return [

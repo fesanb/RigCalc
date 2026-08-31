@@ -1,0 +1,29 @@
+---
+description: Permanent RigCalc structural calculation and geometry-association policy
+alwaysApply: true
+---
+
+# RigCalc structural calculation policy
+
+- The product goal is to calculate every construction geometry found in scope:
+  level, inclined, vertical, curved, inverted, branched, closed, and true 3D.
+  Unsupported geometry is a temporary implementation gap, never an accepted
+  product scope boundary. Record the gap explicitly and create/maintain its
+  GitHub issue.
+- Geometry is the authoritative basis for associating trusses, hoists, dead
+  hangs, and loads. Vectorworks system links are strong positive evidence and
+  may accelerate association, but their absence must not exclude an object.
+  Preserve the association method, distances, confidence, and ambiguity in
+  the model and report.
+- Always calculate and report the unconstrained/signed structural result,
+  including uplift, underload, negative reactions, and signed deflection.
+  A unilateral/tension-only physical solution must additionally model slack,
+  re-engagement, and the hoist/chain mass at the contact point; it must not
+  discard the diagnostic result merely because a support is infeasible.
+- Every discovered hoist receives an explicit outcome. If no load can be
+  calculated, emit `0.00 kN` and a precise drawing/report reason (for example
+  no viable carrier, too far from geometry, ambiguity, or insufficient
+  supports). Never leave an unhandled hoist silent.
+- Automatic writeback remains fail-closed: only a validated physical model is
+  writeback eligible. Diagnostic forces and zero-force failure outcomes must
+  be clearly distinguished from approved loads.

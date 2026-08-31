@@ -28,6 +28,17 @@ class RunSummaryTests(unittest.TestCase):
         self.assertIn("Unhandled calculation objects: 1", text)
         self.assertIn("Status: REVIEW REQUIRED", text)
 
+    def test_counts_inclined_diagnostic_results_separately(self):
+        primary = {"constructions": [{
+            "construction_id": "C1", "status": "diagnostic",
+            "method": "inclined_planar_3d_frame_diagnostic",
+        }]}
+        summary = build_run_summary(
+            DocumentModel(), [object()], primary, {"items": []}, {"items": []})
+        self.assertEqual(summary["diagnostic"]["constructions"], 1)
+        self.assertEqual(summary["diagnostic"]["inclined_planar_frames"], 1)
+        self.assertEqual(summary["uncalculated_constructions"]["count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

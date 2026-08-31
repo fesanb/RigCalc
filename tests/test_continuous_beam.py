@@ -4,8 +4,12 @@ from rigcalc.model import (AttachedObject, Attachment, Construction,
                            DistributedLoad, MechanicalSection, Point3D,
                            PointLoad,
                            StationRange, Support, TrussSegment)
-from rigcalc.solver.beam_statics import trace_construction_loads
+from rigcalc.solver.beam_statics import (solve_inclined_two_support_beam,
+                                         trace_construction_loads)
 from rigcalc.solver.continuous_beam import solve_continuous_beam
+from rigcalc.report.calculation_report import make_calculation_text
+from rigcalc.solver.inclined_geometry import inclined_station_coordinates
+from rigcalc.solver.inclined_beam import solve_inclined_planar_frame
 from tests.reference_beam_solver import solve_uniform_beam
 
 
@@ -84,6 +88,9 @@ class ContinuousBeamTests(unittest.TestCase):
             construction, trace_construction_loads(construction))
         self.assertEqual(result["status"], "preliminary")
         self.assertTrue(result["writeback_eligible"])
+        self.assertEqual(
+            result["active_set_validation"]["method"],
+            "exhaustive_tension_only_active_set")
         self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
         reactions = [item["reaction_mass_kg"] for item in result["reactions"]]
@@ -156,6 +163,97 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertGreater(max(abs(a-b) for a, b in
                                zip(uniform_reactions, variable_reactions)), 1.0)
 
+    def test_truss_self_weight_is_uniform_and_independent_of_segmentation(self):
+        one_piece = construction(
+            10000, [0, 5000, 10000], total_mass_kg=0,
+            segment_sections=[(0, section())])
+        one_piece.truss_segments[0].self_weight_kg = 100.0
+        four_pieces = construction(
+            10000, [0, 5000, 10000], total_mass_kg=0,
+            segment_sections=[
+                (0, section()), (2500, section()),
+                (5000, section()), (7500, section()),
+            ])
+        for truss in four_pieces.truss_segments:
+            truss.self_weight_kg = 25.0
+
+        one_load = trace_construction_loads(one_piece)[0]
+        self.assertEqual(one_load["interval_start_mm"], 0)
+        self.assertEqual(one_load["interval_end_mm"], 10000)
+        self.assertAlmostEqual(one_load["mass_per_m_kg"], 10.0)
+
+        one_reactions = [item["reaction_mass_kg"] for item in solve(one_piece)["reactions"]]
+        four_reactions = [item["reaction_mass_kg"] for item in solve(four_pieces)["reactions"]]
+        for actual, expected in zip(one_reactions, (18.75, 62.5, 18.75)):
+            self.assertAlmostEqual(actual, expected, places=5)
+        for actual, expected in zip(four_reactions, one_reactions):
+            self.assertAlmostEqual(actual, expected, places=5)
+
+    def test_truss_self_weight_uses_physical_interval_when_stationing_is_reversed(self):
+        item = construction(
+            10000, [0, 5000, 10000], total_mass_kg=0,
+            segment_sections=[(0, section())])
+        item.truss_segments[0].self_weight_kg = 100.0
+        item.station_map["T1"] = StationRange(10000, 0, "reverse")
+
+        load = trace_construction_loads(item)[0]
+        self.assertEqual(load["interval_start_mm"], 0)
+        self.assertEqual(load["interval_end_mm"], 10000)
+        self.assertEqual(load["station_mm"], 5000)
+        self.assertAlmostEqual(load["mass_per_m_kg"], 10.0)
+
+    def test_inclined_truss_is_rejected_by_planar_beam_solver(self):
+        item = construction(10000, [0, 5000, 10000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(10000, 0, 1000)
+        result = solve(item)
+        self.assertEqual(result["status"], "not_calculated")
+        self.assertIn("unsupported_inclined_truss_geometry:T1", result["issues"])
+
+    def test_inclined_station_geometry_reduces_a_collinear_chain_to_vertical_plane(self):
+        item = construction(
+            6000, [0, 6000], total_mass_kg=0,
+            segment_sections=[(0, section()), (3000, section())])
+        item.truss_segments[0].start = Point3D(0, 0, 1000)
+        item.truss_segments[0].end = Point3D(3000, 0, 4000)
+        item.truss_segments[1].start = Point3D(3000, 0, 4000)
+        item.truss_segments[1].end = Point3D(6000, 0, 7000)
+        coordinates, issue = inclined_station_coordinates(item)
+        self.assertIsNone(issue)
+        self.assertEqual(coordinates[0], (0, 1000))
+        self.assertEqual(coordinates[3000], (3000, 4000))
+        self.assertEqual(coordinates[6000], (6000, 7000))
+
+    def test_inclined_two_support_result_is_diagnostic_only(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        result = solve_inclined_two_support_beam(
+            item, trace_construction_loads(item))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertFalse(result["writeback_eligible"])
+        self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], 50)
+        self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 50)
+
+    def test_inclined_frame_preserves_total_global_distributed_gravity(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        result = solve_inclined_planar_frame(item, trace_construction_loads(item))
+        self.assertEqual(result["status"], "diagnostic")
+        self.assertAlmostEqual(sum(value["reaction_mass_kg"]
+                                   for value in result["reactions"]), 100.0)
+
+    def test_inclined_frame_asymmetric_point_load_matches_global_statics(self):
+        load = PointLoad("P", "", Point3D(600, 0, 800), "Load", 100)
+        item = construction(
+            5000, [0, 5000], total_mass_kg=0,
+            point_loads=[AttachedObject(load, attachment(1000))])
+        item.truss_segments[0].end = Point3D(3000, 0, 4000)
+        result = solve_inclined_planar_frame(item, trace_construction_loads(item))
+        reactions = [item["reaction_mass_kg"] for item in result["reactions"]]
+        self.assertAlmostEqual(reactions[0], 80.0, places=5)
+        self.assertAlmostEqual(reactions[1], 20.0, places=5)
+        self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
+        self.assertTrue(result["validation"]["moment_equilibrium_ok"])
+
     def test_uniform_load_equilibrium_and_support_deflection_for_2_to_20_supports(self):
         length_mm = 19000.0
         for support_count in range(2, 21):
@@ -220,6 +318,9 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertEqual(
             result["validation"]["reaction_equilibrium_correction"]["method"],
             "two_active_support_static_equilibrium")
+        report = make_calculation_text({"constructions": [result]})
+        self.assertIn("Validation: equilibrium=yes support model=yes", report)
+        self.assertIn("unconstrained signed reaction", report)
 
 
 if __name__ == "__main__":

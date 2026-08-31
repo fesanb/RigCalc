@@ -77,6 +77,7 @@ class DocumentModel:
     point_loads: List[PointLoad] = field(default_factory=list)
     distributed_loads: List[DistributedLoad] = field(default_factory=list)
     unassigned_supports: List[Support] = field(default_factory=list)
+    unassigned_support_diagnostics: dict = field(default_factory=dict)
     unassigned_point_loads: List[PointLoad] = field(default_factory=list)
     unassigned_distributed_loads: List[DistributedLoad] = field(default_factory=list)
     structural_links: List[StructuralLink] = field(default_factory=list)

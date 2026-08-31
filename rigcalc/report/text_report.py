@@ -101,6 +101,17 @@ def make_text_report(document, constructions):
             lines.append("  HOIST {} {} at ({:.1f}, {:.1f}, {:.1f})".format(
                 item.id, _item_name(item), item.position.x, item.position.y,
                 item.position.z))
+            diagnostic = document.unassigned_support_diagnostics.get(item.id, {})
+            if diagnostic:
+                lines.append("    REASON: {}".format(diagnostic.get("reason")))
+                for label in ("nearest_3d", "nearest_plan"):
+                    nearest = diagnostic.get(label)
+                    if nearest:
+                        lines.append(
+                            "    {}: {} / {} clearance {:.1f} mm".format(
+                                label, nearest["construction_id"],
+                                nearest["truss_id"],
+                                nearest["carrier_clearance_mm"]))
         for item in document.unassigned_point_loads:
             lines.append("  LOAD {} {} at ({:.1f}, {:.1f}, {:.1f})".format(
                 item.id, _item_name(item), item.position.x, item.position.y,

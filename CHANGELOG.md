@@ -20,6 +20,11 @@ All notable changes to RigCalc are documented in this file.
 
 ### Changed
 
+- Truss self-weight is now a distributed load over its station interval;
+  result validation and load transfer fail closed for uplift, diagnostic
+  nonlinear solutions, and cyclic construction graphs.
+- The documented solver scope is a planar vertical open-chain beam model;
+  the nonlinear corotational result is diagnostic-only.
 - Connections, stationing, and distance checks now use 3D geometry.
 - Ambiguous or geometrically impossible connections remain visible as explicit
   issues.

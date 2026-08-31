@@ -46,7 +46,7 @@ class CorotationalTests(unittest.TestCase):
         self.assertLess(result["stations"][-1]["displacements"]["ux_m"], 0.0)
         self.assertFalse(result["writeback_eligible"])
 
-    def test_nonlinear_reaction_is_transferred_to_supporting_construction(self):
+    def test_diagnostic_nonlinear_reaction_is_not_transferred(self):
         lower = construction(10000, [0, 10000], total_mass_kg=100)
         lower.id = "LOWER"
         lower.supports[0].item.transfer_target_construction_id = "UPPER"
@@ -62,9 +62,10 @@ class CorotationalTests(unittest.TestCase):
         transferred = [item for item in by_id["UPPER"]["loads"]
                        if item["source_type"] ==
                        "transferred_nonlinear_high_hook_load"]
-        self.assertEqual(len(transferred), 1)
-        self.assertAlmostEqual(transferred[0]["mass_kg"], 50.0, places=3)
-        self.assertTrue(by_id["UPPER"]["converged"])
+        self.assertEqual(transferred, [])
+        self.assertIn(
+            "upstream_nonlinear_load_transfer_ineligible:LOWER",
+            by_id["UPPER"]["issues"])
 
 
 if __name__ == "__main__":

@@ -161,6 +161,27 @@ def _unresolved_explicit_inclined_attachment(support, constructions):
     return construction, attached
 
 
+def _missing_identifier_inclined_attachment(support, constructions):
+    """Diagnostic-only fallback for a uniquely exact plan hit on an incline."""
+    if support.vw_truss_system:
+        return None
+    candidates = []
+    for construction in constructions:
+        attached = attach_item(support, construction, plan_only=True,
+                               method="missing_system_inclined_plan_geometry")
+        if attached is None or attached.attachment.carrier_clearance_mm > config.ATTACHMENT_EXACT_DISTANCE_MM:
+            continue
+        carrier = next((item for item in construction.truss_segments
+                        if item.id == attached.attachment.truss_id), None)
+        if carrier and abs(carrier.end.z-carrier.start.z) >= carrier.geometric_length_mm*sin(radians(5.0)):
+            candidates.append((construction, attached))
+    if len(candidates) != 1:
+        return None
+    construction, attached = candidates[0]
+    attached.attachment.confidence = "INFERRED"
+    return construction, attached
+
+
 def _dead_hang_top_attachment(support, target):
     """Resolve an explicit house rigging point to its nearest UUID port."""
     uuid = support.vw_truss_system_top
@@ -235,6 +256,42 @@ def _attach_structural_links(document, constructions):
             supported.supports.append(attached)
 
 
+def _unassigned_support_diagnostic(support, constructions):
+    """Return auditable evidence without converting proximity into attachment."""
+    candidates = []
+    for construction in constructions:
+        for plan_only, label in ((False, "nearest_3d"), (True, "nearest_plan")):
+            nearest = nearest_line_truss(
+                support.position, construction.truss_segments, plan_only=plan_only)
+            if nearest is None:
+                continue
+            clearance, axis_distance, truss_id, _, local_t, _, _, _ = nearest
+            candidates.append((label, clearance, axis_distance, construction.id,
+                               truss_id, local_t))
+    result = {
+        "missing_truss_system_identifier": not bool(support.vw_truss_system),
+        "missing_top_truss_system_identifier": not bool(
+            support.vw_truss_system_top),
+    }
+    for label in ("nearest_3d", "nearest_plan"):
+        matches = [item for item in candidates if item[0] == label]
+        if matches:
+            _, clearance, axis_distance, construction_id, truss_id, local_t = min(
+                matches, key=lambda item: item[1:])
+            result[label] = {
+                "construction_id": construction_id,
+                "truss_id": truss_id,
+                "carrier_clearance_mm": clearance,
+                "axis_distance_mm": axis_distance,
+                "local_fraction": local_t,
+            }
+    result["reason"] = (
+        "missing_explicit_truss_system_identifier"
+        if result["missing_truss_system_identifier"]
+        else "no_safe_geometry_attachment")
+    return result
+
+
 def attach_document_objects(document, constructions):
     for attribute, objects in (
         ("supports", document.supports),
@@ -246,6 +303,9 @@ def attach_document_objects(document, constructions):
                 explicit = _explicit_support_attachment(item, constructions)
                 if explicit is None:
                     explicit = _unresolved_explicit_inclined_attachment(
+                        item, constructions)
+                if explicit is None:
+                    explicit = _missing_identifier_inclined_attachment(
                         item, constructions)
                 if explicit:
                     construction, attached = explicit
@@ -276,5 +336,8 @@ def attach_document_objects(document, constructions):
             else:
                 unassigned_attribute = "unassigned_" + attribute
                 getattr(document, unassigned_attribute).append(item)
+                if attribute == "supports":
+                    document.unassigned_support_diagnostics[item.id] = (
+                        _unassigned_support_diagnostic(item, constructions))
     _set_hoist_transfer_targets(document, constructions)
     _attach_structural_links(document, constructions)
