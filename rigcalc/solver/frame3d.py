@@ -191,9 +191,17 @@ def solve_frame(model):
     free = [index for index in range(size) if index not in set(restrained)]
     reduced_k = [[stiffness[row][column] for column in free] for row in free]
     reduced_f = [loads[row] for row in free]
-    reduced_u = solve_linear_system(reduced_k, reduced_f) if free else []
+    if free:
+        reduced_u, linear_diagnostics = solve_linear_system(
+            reduced_k, reduced_f, return_diagnostics=True)
+    else:
+        reduced_u, linear_diagnostics = [], {
+            "method": "no_free_degrees_of_freedom", "pivot_count": 0,
+            "minimum_scaled_pivot": 0.0, "maximum_scaled_pivot": 0.0,
+        }
     # Iterative refinement reduces round-off residuals in long beams where
     # translational and rotational stiffness terms differ by many orders.
+    refinement_steps = 0
     for _ in range(3):
         equation_residual = [
             applied-calculated for applied, calculated in
@@ -203,11 +211,23 @@ def solve_frame(model):
             break
         correction = solve_linear_system(reduced_k, equation_residual)
         reduced_u = [value+delta for value, delta in zip(reduced_u, correction)]
+        refinement_steps += 1
     displacement = [0.0] * size
     for index, value in zip(free, reduced_u):
         displacement[index] = value
     residual = [value - applied for value, applied in
                 zip(_matvec(stiffness, displacement), loads)]
+    reduced_residual = [applied-calculated for applied, calculated in
+                        zip(reduced_f, _matvec(reduced_k, reduced_u))]
+    reduced_load_scale = max([abs(value) for value in reduced_f] + [1.0])
+    maximum_reduced_residual = max(
+        [abs(value) for value in reduced_residual] + [0.0])
+    linear_diagnostics.update({
+        "maximum_reduced_residual": maximum_reduced_residual,
+        "relative_reduced_residual": (
+            maximum_reduced_residual / reduced_load_scale),
+        "iterative_refinement_steps": refinement_steps,
+    })
     element_results = []
     for element_id, data in element_data.items():
         element, indices, transform, local_k, local_f, length = data
@@ -227,4 +247,5 @@ def solve_frame(model):
             node.id: residual[order[node.id]*6:order[node.id]*6+6]
             for node in model.nodes},
         "element_results": element_results,
+        "numerical_diagnostics": linear_diagnostics,
     }

@@ -348,6 +348,7 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
             "j": dict(zip(force_labels, values[6:])),
         })
     result["node_displacements"] = frame_result["node_displacements"]
+    result["numerical_diagnostics"] = frame_result["numerical_diagnostics"]
     displacement_labels = ("ux_m", "uy_m", "uz_m", "rx_rad", "ry_rad", "rz_rad")
     for node, station in zip(nodes, stations):
         result["stations"].append({
@@ -364,7 +365,9 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
     if negative_hoists:
         result["issues"].append("tension_only_support_set_unresolved")
     finalize_eligibility(
-        result, support_model_valid=not negative_hoists)
+        result, support_model_valid=not negative_hoists,
+        numerical_valid=(result["numerical_diagnostics"]
+                         ["relative_reduced_residual"] <= 1.0e-8))
     released_count = sum(
         not item["support_active"] for item in result["reactions"])
     if released_count:
