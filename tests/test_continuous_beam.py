@@ -125,6 +125,31 @@ class ContinuousBeamTests(unittest.TestCase):
                 self.assertAlmostEqual(reactions[0], 120.0, places=6)
                 self.assertAlmostEqual(reactions[1], 120.0, places=6)
 
+    def test_mixed_uniform_and_point_load_matches_two_support_statics(self):
+        point = PointLoad("P", "", Point3D(2500, 0), "Load", 60.0)
+        result = solve(construction(
+            10000, [0, 10000], total_mass_kg=100,
+            point_loads=[AttachedObject(point, attachment(2500))]))
+        reactions = [item["reaction_mass_kg"] for item in result["reactions"]]
+        # Uniform 100 kg gives 50/50; 60 kg at one quarter gives 45/15.
+        self.assertAlmostEqual(reactions[0], 95.0, places=6)
+        self.assertAlmostEqual(reactions[1], 65.0, places=6)
+        self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
+        self.assertTrue(result["validation"]["moment_equilibrium_ok"])
+
+    def test_extreme_support_spacing_remains_numerically_auditable(self):
+        result = solve(construction(
+            20000, [0, 25, 20000], total_mass_kg=200,
+            segment_sections=[(0, section("A", 1.0e-7)),
+                              (25, section("B", 1.0e-3))]))
+        self.assertEqual(result["status"], "preliminary")
+        self.assertTrue(result["validation"]["numerically_valid"])
+        self.assertLess(
+            result["numerical_diagnostics"]["relative_reduced_residual"],
+            1.0e-8)
+        self.assertGreater(
+            result["numerical_diagnostics"]["minimum_scaled_pivot"], 0.0)
+
     def test_overhang_point_load_matches_static_reference_and_keeps_uplift(self):
         load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
         item = construction(
