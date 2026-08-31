@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import os
 
 from rigcalc.vw.layer_dialog import (candidate_layers,
                                       choose_calculation_scope,
@@ -37,6 +38,12 @@ class FakeDialogVS:
         return 1
 
 
+class CancelDialogVS(FakeDialogVS):
+    def RunLayoutDialog(self, dialog, handler):
+        handler(12255, None)
+        return 2
+
+
 class LayerDialogTests(unittest.TestCase):
     def test_only_layers_with_calculation_relevant_pios_are_offered(self):
         inventory = [
@@ -65,6 +72,22 @@ class LayerDialogTests(unittest.TestCase):
         self.assertEqual(context["document_name"], "Representative rig.vwx")
         self.assertEqual(context["relevant_object_count"], 2)
         self.assertTrue(context["previous_selection_available"])
+
+    def test_cancel_does_not_persist_a_selection(self):
+        inventory = [{"layer_name": "Rigging", "parametric_record": "TrussItem"}]
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertIsNone(choose_calculation_scope(
+                CancelDialogVS(), inventory, directory))
+            self.assertFalse(os.path.exists(
+                os.path.join(directory, "rigcalc_layer_selection.json")))
+
+    def test_no_relevant_layers_stops_before_creating_a_dialog(self):
+        vs = FakeDialogVS()
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertIsNone(choose_calculation_scope(vs, [{
+                "layer_name": "Sheet", "parametric_record": "Title Block Border",
+            }], directory))
+        self.assertIn("no layers", vs.alerts[0].lower())
 
 
 if __name__ == "__main__":
