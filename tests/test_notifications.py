@@ -86,6 +86,8 @@ class FakeVS:
         self.class_attributes = {}
 
     def ActiveClass(self): return self.active_class
+    def ClassNum(self): return len(self.classes)
+    def ClassList(self, index): return sorted(self.classes)[index-1]
     def GetObject(self, name):
         return "class:" + name if name in self.classes else None
     def GetTypeN(self, handle):
@@ -176,6 +178,16 @@ class NotificationWriterTests(unittest.TestCase):
             vs.class_attributes["RigCalc-Internal"]["line_weight"], 5)
         self.assertEqual(
             vs.class_attributes["RigCalc-Internal"]["opacity"], 100)
+
+    def test_second_run_does_not_create_duplicate_classes(self):
+        vs = FakeVS()
+        document = DocumentModel()
+        write_notification_markers(vs, document, [], [])
+        classes_after_first_run = set(vs.classes)
+
+        write_notification_markers(vs, document, [], [])
+
+        self.assertEqual(vs.classes, classes_after_first_run)
 
 
 if __name__ == "__main__":

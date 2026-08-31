@@ -25,13 +25,19 @@ CLASS_FILL_COLORS = {
 TEXT_HAS_TIGHT_FILL_SELECTOR = 684
 
 
+def _class_exists(vs, name):
+    """Return whether *name* already occurs in the document class list."""
+    return any(vs.ClassList(index) == name
+               for index in range(1, vs.ClassNum() + 1))
+
+
 def _ensure_classes(vs):
     old_class = vs.ActiveClass() if hasattr(vs, "ActiveClass") else None
     try:
         for name in (BASE_CLASS,) + NOTIFICATION_CLASSES:
-            existing = vs.GetObject(name)
-            is_class = bool(existing and vs.GetTypeN(existing) == 94)
-            if not is_class:
+            # GetObject does not reliably return a class definition in all
+            # Vectorworks contexts, so look in the document's class table.
+            if not _class_exists(vs, name):
                 vs.NameClass(name)
                 if name in CLASS_FILL_COLORS:
                     color = CLASS_FILL_COLORS[name]
