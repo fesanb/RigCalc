@@ -26,3 +26,8 @@ Thumbs.db
 # Local Vectorworks drawings and automatic backups can contain project data
 # and are too large for the source repository.
 VW_Testfiles/
+
+# Project-wide Codex/Cursor rules are source-controlled team guidance.
+!.cursor/
+!.cursor/rules/
+!.cursor/rules/*.mdc
