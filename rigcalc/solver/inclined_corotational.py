@@ -11,9 +11,10 @@ from math import sqrt
 from .beam_statics import _reaction_record
 from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
                               STATION_TOLERANCE_MM, _section_at,
-                              _section_result)
+                              _section_result, _unique_stations)
 from .corotational import (CorotationalElement, CorotationalModel,
-                           CorotationalNode, solve_corotational)
+                           CorotationalCable, CorotationalNode,
+                           solve_corotational)
 from .contact import contact_mass_by_support, engaged_contact_mass_loads
 from .deflection import build_deflection_summary, support_span_midpoints
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
@@ -106,11 +107,34 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     if len(supports) < 2 or not loads:
         result["issues"].append("requires_two_or_more_distinct_supports")
         return result
-    stations = _stations(coordinates, all_supports, supports, loads)
+    # Vectorworks geometry commonly contains mathematically equal station
+    # values with tiny floating-point differences.  They must not create a
+    # zero-length frame element.
+    stations = _unique_stations(
+        _stations(coordinates, all_supports, supports, loads))
     points = [planar_coordinate(station, coordinates) for station in stations]
     if any(x is None or z is None for x, z in points):
         result["issues"].append("unsupported_partial_inclined_station")
         return result
+    cable_supports = [item for item in supports
+                      if (not item.item.is_structural_link and
+                          item.item.object_position is not None and
+                          item.item.object_position.z >
+                          item.item.position.z+1.0)]
+    # A cable model is only enabled when every motor in this construction has
+    # an observed upper point.  We never invent an anchor from a trim field.
+    use_cables = (bool(cable_supports) and
+                  len(cable_supports) == len([item for item in supports
+                                              if not item.item.is_structural_link]) and
+                  _active_ids is None)
+    if use_cables:
+        # The cable supports are engaged from the start of this nonlinear
+        # solve, so their documented hoist/chain mass belongs at the lower
+        # contact point just as it does for the level-chain contact model.
+        loads = list(loads) + engaged_contact_mass_loads(cable_supports)
+        result["loads"] = loads
+        result["total_applied_mass_kg"] = sum(
+            item["mass_kg"] for item in loads)
     active_stations = {round(item.attachment.global_station_mm, 6)
                        for item in supports}
     anchor = min(active_stations)
@@ -118,7 +142,8 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     nodes = [CorotationalNode(
         "N{:04d}".format(index), x/1000.0, z/1000.0,
         restrained=(round(station, 6) == anchor,
-                    round(station, 6) in active_stations, False),
+                    False if use_cables else round(station, 6) in active_stations,
+                    False),
         load=tuple(node_loads[index]))
         for index, (station, (x, z)) in enumerate(zip(stations, points))]
     elements = []
@@ -138,8 +163,41 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
             "E{:04d}".format(index), nodes[index].id, nodes[index+1].id,
             section.elastic_modulus_pa, section.area_m2, section.iyy_m4))
         element_sections["E{:04d}".format(index)] = _section_result(section)
+    cables = []
+    if use_cables:
+        node_by_station = {round(station, 6): node
+                           for station, node in zip(stations, nodes)}
+        for support in cable_supports:
+            lower = node_by_station[round(
+                support.attachment.global_station_mm, 6)]
+            upper = support.item.object_position
+            # ``lower.x`` is the local in-plane coordinate along the truss
+            # chain.  A Vectorworks world X value is not interchangeable
+            # with it (many rigs run along world Y).  The scanned motor and
+            # lower pickup share plan position for a vertical chain, so the
+            # physical cable anchor is directly above this projected station.
+            anchor_node = CorotationalNode(
+                "CABLE_TOP:{}".format(support.item.id),
+                lower.x, upper.z/1000.0,
+                restrained=(True, True, True))
+            nodes.append(anchor_node)
+            length = sqrt((anchor_node.x-lower.x)**2 +
+                          (anchor_node.z-lower.z)**2)
+            cables.append(CorotationalCable(
+                support.item.id, anchor_node.id, lower.id,
+                # A finite axial stiffness gives Newton iteration a usable
+                # tangent through the slack/taut transition.  It is stiff
+                # relative to the frame while avoiding an artificial rigid
+                # constraint at the first load increment.
+                1.0e7, length))
     try:
-        solved = solve_corotational(CorotationalModel(nodes, elements))
+        solved = solve_corotational(
+            CorotationalModel(nodes, elements, cables=cables),
+            # Multi-hoist inclined frames enter the cable-contact branch from
+            # an unloaded, zero-tension state.  Smaller initial increments
+            # give Newton iteration a stable path onto that branch.
+            initial_load_step=0.02, minimum_load_step=0.00025,
+            maximum_load_step=0.15, max_iterations=70)
     except ValueError as error:
         result["issues"].append(str(error))
         return result
@@ -149,12 +207,27 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
         "completed_load_factor": solved["completed_load_factor"],
         "load_history": solved["load_history"],
     })
+    cable_by_id = {item["cable_id"]: item
+                   for item in solved.get("cable_results", [])}
     for support in supports:
         index = next(index for index, station in enumerate(stations)
                      if abs(station-support.attachment.global_station_mm)
                      <= STATION_TOLERANCE_MM)
-        result["reactions"].append(_reaction_record(
-            support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
+        if support.item.id in cable_by_id:
+            cable = cable_by_id[support.item.id]
+            reaction = _reaction_record(
+                support, cable["tension_n"]/GRAVITY_M_S2)
+            reaction["support_active"] = bool(cable["tension_n"] > 1.0e-5)
+            reaction["vertical_reaction_mass_kg"] = (
+                cable["tension_n"] * abs(
+                    (nodes[index].z - next(node.z for node in nodes
+                     if node.id == cable["node_i"])) / cable["length_m"]
+                ) / GRAVITY_M_S2)
+            reaction["support_force_model"] = "tension_only_cable"
+            result["reactions"].append(reaction)
+        else:
+            result["reactions"].append(_reaction_record(
+                support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
     contact_masses = contact_mass_by_support(loads)
     for reaction in result["reactions"]:
         mass = contact_masses.get(reaction["support_id"], 0.0)
@@ -168,7 +241,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                 "reaction_includes_engaged_contact_mass_diagnostic")
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
-    if _active_ids is None:
+    if _active_ids is None and not use_cables:
         hoists = [item for item in all_supports if not item.item.is_structural_link]
         if len(hoists) <= MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS:
             candidates = []
@@ -226,10 +299,13 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
              solved["node_displacements"][node.id][1], 0.0,
              solved["node_displacements"][node.id][2], 0.0))),
     } for node, station in zip(nodes, stations)]
-    reaction_total = sum(item["reaction_mass_kg"] for item in result["reactions"])
+    reaction_total = sum(item.get("vertical_reaction_mass_kg",
+                                  item["reaction_mass_kg"])
+                         for item in result["reactions"])
     applied_moment = sum(item["mass_kg"]*planar_coordinate(
         item["station_mm"], coordinates)[0]/1000.0 for item in loads)
-    reaction_moment = sum(item["reaction_mass_kg"]*planar_coordinate(
+    reaction_moment = sum(item.get("vertical_reaction_mass_kg",
+                                   item["reaction_mass_kg"])*planar_coordinate(
         item["station_mm"], coordinates)[0]/1000.0
                           for item in result["reactions"])
     result["validation"] = {

@@ -151,12 +151,10 @@ class ContinuousBeamTests(unittest.TestCase):
                                    for item in result["reactions"]), 130.0,
                                places=6)
         self.assertTrue(result["validation"]["support_model_valid"])
-        self.assertFalse(result["writeback_eligible"])
+        self.assertTrue(result["writeback_eligible"])
         self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
                          10.0)
-        self.assertIn(
-            "tension_only_contact_model_diagnostic_not_writeback_source",
-            result["issues"])
+        self.assertFalse(result["load_transfer_eligible"])
 
     def test_extreme_support_spacing_remains_numerically_auditable(self):
         result = solve(construction(

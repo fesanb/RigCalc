@@ -392,16 +392,20 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         # re-engagement and hoist/chain mass are represented at contact.
         result["issues"].append(
             "tension_only_contact_mass_model_not_implemented")
-    elif has_hoist_support:
-        result["issues"].append(
-            "tension_only_contact_model_diagnostic_not_writeback_source")
     finalize_eligibility(
         result, support_model_valid=(not negative_hoists and
                                      active_set_issue is None and
                                      not contact_mass_model_missing),
         numerical_valid=(result["numerical_diagnostics"]
                          ["relative_reduced_residual"] <= 1.0e-8),
-        permit_writeback=not has_hoist_support)
+        # A level open chain with an exhaustive tension-only contact state,
+        # engaged hoist/chain masses, and passing numerical/equilibrium
+        # checks is the supported writeback model.  Geometry or contact
+        # failures above remain fail-closed through support_model_valid.
+        permit_writeback=True,
+        # A High Hook field write must not silently authorize a new upstream
+        # structural load path.  Transfer has its own model-validation gate.
+        permit_load_transfer=not has_hoist_support)
     released_count = sum(
         not item["support_active"] for item in result["reactions"])
     if released_count:

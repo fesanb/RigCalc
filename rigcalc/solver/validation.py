@@ -11,7 +11,8 @@ def load_transfer_eligible(result):
 
 
 def finalize_eligibility(result, support_model_valid, numerical_valid=True,
-                         load_model_valid=True, permit_writeback=True):
+                         load_model_valid=True, permit_writeback=True,
+                         permit_load_transfer=None):
     """Record validation levels and derive writeback/transfer eligibility.
 
     Force and moment equilibrium are necessary but cannot alone demonstrate a
@@ -33,6 +34,9 @@ def finalize_eligibility(result, support_model_valid, numerical_valid=True,
     eligible = bool(
         permit_writeback and calculated and equilibrium_valid and
         support_model_valid and numerical_valid and load_model_valid)
+    if permit_load_transfer is None:
+        permit_load_transfer = permit_writeback
     result["writeback_eligible"] = eligible
-    result["load_transfer_eligible"] = eligible
+    result["load_transfer_eligible"] = bool(
+        eligible and permit_load_transfer)
     return eligible

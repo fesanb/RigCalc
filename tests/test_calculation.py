@@ -33,9 +33,11 @@ class CalculationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["calculated"])
         self.assertTrue(result["validation"]["equilibrium_valid"])
         self.assertTrue(result["validation"]["support_model_valid"])
+        self.assertTrue(result["writeback_eligible"])
         self.assertFalse(result["load_transfer_eligible"])
-        self.assertIn("tension_only_contact_model_diagnostic_not_writeback_source",
-                      result["issues"])
+        self.assertEqual(
+            result["validation"]["contact_model"],
+            "two_support_tension_only_with_engaged_contact_mass")
 
     def test_configured_cable_rate_is_applied_over_each_truss_length(self):
         start, end = Point3D(0, 0), Point3D(10000, 0)

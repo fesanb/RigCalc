@@ -32,9 +32,20 @@ class CorotationalElement:
 
 
 @dataclass
+class CorotationalCable:
+    """Axial, tension-only cable between a fixed motor point and a truss."""
+    id: str
+    node_i: str
+    node_j: str
+    axial_stiffness_n_m: float
+    unstretched_length_m: float
+
+
+@dataclass
 class CorotationalModel:
     nodes: list = field(default_factory=list)
     elements: list = field(default_factory=list)
+    cables: list = field(default_factory=list)
 
 
 def _element_state(element, node_i, node_j, displacement):
@@ -76,6 +87,31 @@ def _element_force(element, node_i, node_j, displacement):
         element, node_i, node_j, displacement)["global_force"]
 
 
+def _cable_state(cable, node_i, node_j, displacement):
+    ui, wi, _, uj, wj, _ = displacement
+    dx = node_j.x+uj-node_i.x-ui
+    dz = node_j.z+wj-node_i.z-wi
+    length = hypot(dx, dz)
+    if length <= 1.0e-12:
+        raise ValueError("zero_length_cable")
+    extension = length-cable.unstretched_length_m
+    tension = max(0.0, cable.axial_stiffness_n_m*extension)
+    c, s = dx/length, dz/length
+    return {
+        # The corotational residual uses the same internal-force sign
+        # convention as the frame elements: a taut vertical cable supplies a
+        # negative-z resisting force at its lower node.
+        "global_force": (-tension*c, -tension*s, 0.0,
+                         tension*c, tension*s, 0.0),
+        "length_m": length, "extension_m": extension,
+        "tension_n": tension, "active": extension >= 0.0,
+    }
+
+
+def _cable_force(cable, node_i, node_j, displacement):
+    return _cable_state(cable, node_i, node_j, displacement)["global_force"]
+
+
 def _internal_force(model, displacement, order):
     nodes = {node.id: node for node in model.nodes}
     result = [0.0]*len(displacement)
@@ -84,6 +120,14 @@ def _internal_force(model, displacement, order):
                    [3*order[element.node_j]+dof for dof in range(3)])
         force = _element_force(
             element, nodes[element.node_i], nodes[element.node_j],
+            [displacement[index] for index in indices])
+        for index, value in zip(indices, force):
+            result[index] += value
+    for cable in model.cables:
+        indices = ([3*order[cable.node_i]+dof for dof in range(3)] +
+                   [3*order[cable.node_j]+dof for dof in range(3)])
+        force = _cable_force(
+            cable, nodes[cable.node_i], nodes[cable.node_j],
             [displacement[index] for index in indices])
         for index, value in zip(indices, force):
             result[index] += value
@@ -110,6 +154,27 @@ def _numerical_tangent(model, displacement, order, free):
                 element, nodes[element.node_i], nodes[element.node_j], plus)
             force_minus = _element_force(
                 element, nodes[element.node_i], nodes[element.node_j], minus)
+            for local_row, global_row in enumerate(indices):
+                row = free_order.get(global_row)
+                if row is not None:
+                    tangent[row][column] += (
+                        force_plus[local_row]-force_minus[local_row])/(2.0*step)
+    for cable in model.cables:
+        indices = ([3*order[cable.node_i]+dof for dof in range(3)] +
+                   [3*order[cable.node_j]+dof for dof in range(3)])
+        local_u = [displacement[index] for index in indices]
+        for local_column, global_column in enumerate(indices):
+            column = free_order.get(global_column)
+            if column is None:
+                continue
+            step = 1.0e-7*max(1.0, abs(local_u[local_column]))
+            plus, minus = list(local_u), list(local_u)
+            plus[local_column] += step
+            minus[local_column] -= step
+            force_plus = _cable_force(cable, nodes[cable.node_i],
+                                      nodes[cable.node_j], plus)
+            force_minus = _cable_force(cable, nodes[cable.node_i],
+                                       nodes[cable.node_j], minus)
             for local_row, global_row in enumerate(indices):
                 row = free_order.get(global_row)
                 if row is not None:
@@ -173,7 +238,10 @@ def solve_corotational(model, initial_load_step=0.1, minimum_load_step=0.0025,
                 trial_norm = max([
                     abs(target[index]-trial_internal[index])
                     for index in free] + [0.0])
-                if trial_norm < residual_norm:
+                # A cable that is exactly at its slack/taut boundary has a
+                # one-sided tangent.  Accept an equal-norm first trial so
+                # the following Newton step can enter the taut branch.
+                if trial_norm <= residual_norm*(1.0+1.0e-12):
                     displacement = trial
                     accepted = True
                     break
@@ -214,6 +282,17 @@ def solve_corotational(model, initial_load_step=0.1, minimum_load_step=0.0025,
                   "Vz_n": -state["shear_n"], "T_nm": 0.0,
                   "My_nm": state["moment_j_nm"], "Mz_nm": 0.0},
         })
+    cable_results = []
+    for cable in model.cables:
+        indices = ([3*order[cable.node_i]+dof for dof in range(3)] +
+                   [3*order[cable.node_j]+dof for dof in range(3)])
+        state = _cable_state(
+            cable, nodes[cable.node_i], nodes[cable.node_j],
+            [displacement[index] for index in indices])
+        cable_results.append({
+            "cable_id": cable.id, "node_i": cable.node_i,
+            "node_j": cable.node_j, **state,
+        })
     return {
         "converged": converged,
         "iterations": iterations,
@@ -228,4 +307,5 @@ def solve_corotational(model, initial_load_step=0.1, minimum_load_step=0.0025,
                       for dof in range(3)]
             for node in model.nodes},
         "element_results": element_results,
+        "cable_results": cable_results,
     }

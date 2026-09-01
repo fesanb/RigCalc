@@ -1,7 +1,7 @@
 import unittest
 
 from rigcalc.solver.corotational import (
-    CorotationalElement, CorotationalModel, CorotationalNode,
+    CorotationalCable, CorotationalElement, CorotationalModel, CorotationalNode,
     solve_corotational)
 from rigcalc.solver.beam_statics import trace_construction_loads
 from rigcalc.solver.nonlinear_beam import solve_corotational_beam
@@ -14,6 +14,19 @@ from tests.test_continuous_beam import attachment
 
 
 class CorotationalTests(unittest.TestCase):
+    def test_cable_carries_tension_but_goes_slack_in_compression(self):
+        model = CorotationalModel(
+            nodes=[
+                CorotationalNode("TOP", 0, 1, restrained=(True, True, True)),
+                CorotationalNode("LOAD", 0, 0, restrained=(True, False, True),
+                                  load=(0, -1000, 0)),
+            ],
+            cables=[CorotationalCable("C", "TOP", "LOAD", 1e7, 1.0)])
+        result = solve_corotational(model)
+        self.assertTrue(result["converged"])
+        self.assertAlmostEqual(result["cable_results"][0]["tension_n"], 1000,
+                               delta=0.1)
+        self.assertTrue(result["cable_results"][0]["active"])
     def test_simply_supported_beam_converges_and_roller_moves_horizontally(self):
         model = CorotationalModel(
             nodes=[
@@ -126,6 +139,25 @@ class CorotationalTests(unittest.TestCase):
                          result["issues"])
         self.assertIn("includes engaged contact mass",
                       make_calculation_text({"constructions": [result]}))
+
+    def test_inclined_adapter_uses_observed_motor_points_as_cables(self):
+        item = construction(6000, [0, 6000], total_mass_kg=100)
+        item.truss_segments[0].end = Point3D(6000, 0, 3000)
+        item.supports[0].item.weight_with_chain_kg = 10.0
+        item.supports[1].item.weight_with_chain_kg = 20.0
+        item.supports[0].item.object_position = Point3D(0, 0, 6000)
+        item.supports[1].item.object_position = Point3D(6000, 0, 9000)
+        result = solve_corotational_beam(
+            item, trace_construction_loads(item))
+        self.assertTrue(result["converged"])
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0)
+        self.assertTrue(all(item.get("support_force_model") ==
+                            "tension_only_cable"
+                            for item in result["reactions"]))
+        self.assertAlmostEqual(
+            sum(item.get("vertical_reaction_mass_kg", 0.0)
+                for item in result["reactions"]),
+            result["total_applied_mass_kg"], delta=0.1)
 
 
 if __name__ == "__main__":

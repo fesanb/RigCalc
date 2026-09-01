@@ -95,6 +95,17 @@ class HoistWritebackTests(unittest.TestCase):
                              "skipped_invalid_high_hook_mass")
             self.assertEqual(vs.fields["ReactionForceWeight"], "0")
 
+    def test_released_support_is_not_written(self):
+        vs = FakeVS()
+        calculation = self.calculation()
+        calculation["constructions"][0]["reactions"][0]["support_active"] = False
+        result = write_high_hook_values(vs, DocumentModel(supports=[
+            Support("H1", "Hoist", Point3D(0, 0), source_ref="handle")]),
+            calculation)
+        self.assertEqual(result["status"], "nothing_to_write")
+        self.assertEqual(result["items"][0]["status"],
+                         "skipped_slack_or_released_support")
+
 
 if __name__ == "__main__":
     unittest.main()

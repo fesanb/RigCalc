@@ -62,6 +62,27 @@ class RunSummaryTests(unittest.TestCase):
         self.assertEqual(summary["technical_errors"]["count"], 1)
         self.assertIn("Status: REVIEW REQUIRED", make_run_summary_text(summary))
 
+    def test_reports_constructions_grouped_by_writeback_blocker(self):
+        primary = {"constructions": [
+            {"construction_id": "C1", "status": "preliminary",
+             "writeback_eligible": False,
+             "issues": ["contact_model_pending"]},
+            {"construction_id": "C2", "status": "diagnostic",
+             "writeback_eligible": False,
+             "issues": ["contact_model_pending", "inclined_diagnostic"]},
+            {"construction_id": "C3", "status": "preliminary",
+             "writeback_eligible": True,
+             "issues": ["historical_note"]},
+        ]}
+        summary = build_run_summary(
+            DocumentModel(), [], primary, {"items": []}, {"items": []})
+        self.assertEqual(summary["technical_errors"]["blocking_issues"], {
+            "contact_model_pending": ["C1", "C2"],
+            "inclined_diagnostic": ["C2"],
+        })
+        self.assertIn("Writeback-blocking reasons: 2",
+                      make_run_summary_text(summary))
+
 
 if __name__ == "__main__":
     unittest.main()

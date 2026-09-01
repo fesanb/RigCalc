@@ -192,11 +192,12 @@ def solve_two_support_beam(construction, loads):
                 result["issues"].append(
                     "tension_only_contact_mass_model_not_implemented")
             elif hoists:
-                result["issues"].append(
-                    "tension_only_contact_model_diagnostic_not_writeback_source")
+                result["validation"]["contact_model"] = (
+                    "two_support_tension_only_with_engaged_contact_mass")
             finalize_eligibility(
                 result, support_model_valid=support_model_valid,
-                permit_writeback=not hoists)
+                permit_writeback=True,
+                permit_load_transfer=not hoists)
     return result
 
 

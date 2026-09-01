@@ -17,6 +17,14 @@ def build_run_summary(document, constructions, primary, writeback,
         item["construction_id"] for item in primary["constructions"]
         if (item.get("status") == "preliminary" and
             not item.get("writeback_eligible", False))}
+    blocked_by_issue = {}
+    for item in primary["constructions"]:
+        if (item.get("status") not in ("preliminary", "diagnostic") or
+                item.get("writeback_eligible", False)):
+            continue
+        construction_id = item.get("construction_id", "")
+        for issue in item.get("issues", []):
+            blocked_by_issue.setdefault(issue, []).append(construction_id)
     writeback_failures = [
         item for result in (writeback, cross_writeback)
         for item in result.get("items", [])
@@ -90,6 +98,10 @@ def build_run_summary(document, constructions, primary, writeback,
             "count": len(failed_ids)+len(writeback_failures),
             "construction_ids": sorted(failed_ids),
             "writeback_failure_count": len(writeback_failures),
+            "blocking_issues": {
+                issue: sorted(ids) for issue, ids in sorted(
+                    blocked_by_issue.items())
+            },
         },
         "notifications": {
             "count": len(notifications),
@@ -130,6 +142,7 @@ def make_run_summary_text(summary):
     hoist_ids = summary.get("hoist_ids", {})
     hoist_outcomes = summary.get("hoist_outcomes", {})
     notifications = summary.get("notifications", {})
+    blocking_issues = errors.get("blocking_issues", {})
     status = "REVIEW REQUIRED" if (
         errors["count"] or uncalculated.get("count", 0) or
         unhandled["count"] or notifications.get("load_errors", 0) or
@@ -159,6 +172,7 @@ def make_run_summary_text(summary):
         "Deflection markers: {}\n"
         "Internal-force errors: {}\n"
         "Technical errors: {}\n"
+        "Writeback-blocking reasons: {}\n"
         "Uncalculated constructions: {}\n"
         "Unhandled calculation objects: {}\n"
         "  Hoists: {}\n"
@@ -182,6 +196,7 @@ def make_run_summary_text(summary):
         notifications.get("load_errors", 0),
         notifications.get("deflections", 0),
         notifications.get("internal_errors", 0), errors["count"],
+        len(blocking_issues),
         uncalculated.get("count", 0),
         unhandled["count"], unhandled["hoists"],
         unhandled["dead_hangs"],
