@@ -34,7 +34,8 @@ class TrussSegment:
 
     @property
     def is_line(self):
-        return self.item_type == "Line" and self.start is not None and self.end is not None
+        return (self.item_type in ("Line", "Lighting Pipe") and
+                self.start is not None and self.end is not None)
 
     @property
     def geometric_length_mm(self):

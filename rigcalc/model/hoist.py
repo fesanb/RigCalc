@@ -10,10 +10,17 @@ class Support:
     name: str
     position: Point3D
     hoist_id: str = ""
+    motor_type: str = ""
+    object_uuid: str = ""
     capacity_raw: str = ""
     vw_truss_system: str = ""
     vw_truss_system_top: str = ""
     weight_with_chain_kg: float = 0.0
+    weight_with_chain_raw_kg: float = 0.0
+    # Vectorworks' RoofForceNoDeadloadWeight is the manually maintained load
+    # excluding hoist/chain deadload. It is only honoured for a free hoist.
+    manual_load_kg: float = 0.0
+    manual_load_raw_kg: float = 0.0
     capacity_kg: float = 0.0
     transfer_target_construction_id: str = ""
     transfer_target_station_mm: Optional[float] = None

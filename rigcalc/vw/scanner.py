@@ -12,6 +12,17 @@ def _point_with_z(point, z):
     return Point3D(point.x, point.y, z)
 
 
+def _object_uuid(vs, handle):
+    """Read VW's persistent object UUID without inventing an identifier."""
+    try:
+        value = vs.GetObjectUuid(handle)
+        if isinstance(value, (tuple, list)):
+            return str(value[-1]) if value and value[0] else ""
+        return str(value or "")
+    except Exception:
+        return ""
+
+
 def _parse_truss(vs, handle, object_id, fields, cable_load_kg_m=0.0,
                  safety_factor=1.0):
     location = symbol_location(vs, handle)
@@ -63,16 +74,54 @@ def _parse_truss(vs, handle, object_id, fields, cable_load_kg_m=0.0,
     )
 
 
+def _parse_lighting_pipe(vs, handle, object_id, fields, safety_factor=1.0):
+    """Read a Vectorworks Lighting Pipe as a geometric carrier.
+
+    A Lighting Pipe is often suspended directly by hoists although it does not
+    participate in Spotlight's Truss System.  It remains a distinct carrier:
+    no unverified Braceworks cross section is invented for it.
+    """
+    location = symbol_location(vs, handle)
+    if location is None:
+        return None
+    length = safe_float(fields.get("TotalLength"), 0.0)
+    if length <= 0.0:
+        return None
+    position = _point_with_z(location, center_z(vs, handle))
+    rotation = z_rotation(vs, handle)
+    angle = math.radians(rotation)
+    end = Point3D(position.x + math.cos(angle)*length,
+                  position.y + math.sin(angle)*length, position.z)
+    diameter = safe_float(fields.get("pipeW"), 0.0)
+    return TrussSegment(
+        id=object_id, name=fields.get("Index") or fields.get("Name", ""),
+        item_type="Lighting Pipe", position=position,
+        nominal_length_mm=length, start=position, end=end,
+        bbox=bounding_box(vs, handle), z_rotation_deg=rotation,
+        symbol=fields.get("Pipe", ""), truss_type="Lighting Pipe",
+        width_mm=diameter, height_mm=diameter,
+        self_weight_kg=(safe_float(fields.get("Weight"), 0.0) / 1000.0 *
+                        safety_factor),
+        source_ref=handle,
+    )
+
+
 def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
     location = symbol_location(vs, handle)
     if location is None:
         return None
     # Use the lower rigging connection, not the hoist geometry centre.
     # Spotlight stores X/Y in Origin and the lower carrier trim separately.
+    lower_trim = safe_float(fields.get("TrussBottomTrim"), 0.0)
+    # An inverted hoist's lower connection is its load trim.  Empty/zero
+    # TrussBottomTrim is common when it is attached to a Lighting Pipe rather
+    # than a Spotlight Truss System.
+    if fields.get("HoistPos", "").strip().lower() == "hoist up":
+        lower_trim = safe_float(fields.get("LoadTrim"), lower_trim)
     position = Point3D(
         safe_float(fields.get("OriginX"), location.x),
         safe_float(fields.get("OriginY"), location.y),
-        safe_float(fields.get("TrussBottomTrim"), center_z(vs, handle)),
+        lower_trim if lower_trim else center_z(vs, handle),
     )
     geometry_field_names = (
         "HoistPos", "HoistType", "OriginX", "OriginY", "LoadTrim",
@@ -92,10 +141,19 @@ def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
     return Support(
         id=object_id, name=fields.get("HoistName", ""),
         hoist_id=fields.get("HoistID", ""), position=position,
+        motor_type=fields.get("SymbolUsed", "") or fields.get("HoistName", ""),
+        object_uuid=_object_uuid(vs, handle),
         capacity_raw=fields.get("Capacity", ""), vw_truss_system=fields.get("TrussSysBottom", ""),
         vw_truss_system_top=fields.get("TrussSysTop", ""),
         weight_with_chain_kg=(safe_float(
             fields.get("WeightWithChain"), 0.0) / 1000.0 * safety_factor),
+        weight_with_chain_raw_kg=(safe_float(
+            fields.get("WeightWithChain"), 0.0) / 1000.0),
+        manual_load_kg=(safe_float(
+            fields.get("RoofForceNoDeadloadWeight"), 0.0) / 1000.0 *
+                        safety_factor),
+        manual_load_raw_kg=(safe_float(
+            fields.get("RoofForceNoDeadloadWeight"), 0.0) / 1000.0),
         capacity_kg=safe_float(fields.get("Capacity"), 0.0) / 1000.0,
         object_position=Point3D(location.x, location.y, center_z(vs, handle)),
         geometry_fields=geometry_fields,
@@ -197,6 +255,7 @@ def _parse_normalized_loads(vs, handle, object_id, record_name, fields,
                     " - " + component["label"] if len(components) > 1 else ""),
                 position=base.position, weight_raw=component.get("source_value"),
                 weight_kg=component["mass_kg"] * safety_factor,
+                unfactored_weight_kg=component["mass_kg"],
                 raw_fields=fields,
                 source_ref=handle,
             ))
@@ -295,6 +354,12 @@ def scan_document(vs_module=None, included_layers=None, progress=None,
             item = _parse_truss(
                 vs_module, handle, "T{:03d}".format(counter), fields,
                 cable_load_kg_m=cable_load_kg_m,
+                safety_factor=safety_factor)
+            if item:
+                document.trusses.append(item)
+        elif record_name == "Lighting Pipe":
+            item = _parse_lighting_pipe(
+                vs_module, handle, "P{:03d}".format(counter), fields,
                 safety_factor=safety_factor)
             if item:
                 document.trusses.append(item)

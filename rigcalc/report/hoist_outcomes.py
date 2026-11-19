@@ -4,6 +4,10 @@ An unavailable calculation is never represented by a silent omission.  Zero
 outcomes are diagnostic only and deliberately never authorize writeback.
 """
 
+from math import sqrt
+
+from rigcalc import config
+
 
 def _attachment_evidence(attached):
     attachment = attached.attachment
@@ -15,6 +19,33 @@ def _attachment_evidence(attached):
         "carrier_clearance_mm": attachment.carrier_clearance_mm,
         "global_station_mm": attachment.global_station_mm,
     }
+
+
+def _direct_loads_for_free_hoist(support, document):
+    """Return unique point loads directly under an otherwise free hoist.
+
+    This does not infer a truss relationship.  It is intentionally limited to
+    unassigned point loads at the lower hook and refuses a load shared by
+    multiple free hoists.
+    """
+    candidates = []
+    for load in document.unassigned_point_loads:
+        if load.weight_kg is None:
+            continue
+        distance = sqrt(
+            (load.position.x-support.position.x) ** 2 +
+            (load.position.y-support.position.y) ** 2 +
+            (load.position.z-support.position.z) ** 2)
+        if distance <= config.DIRECT_HOIST_LOAD_DISTANCE_MM:
+            candidates.append((distance, load))
+    if not candidates:
+        return []
+    nearest_distance = min(item[0] for item in candidates)
+    nearest = [item for item in candidates
+               if abs(item[0]-nearest_distance) <= 1.0e-6]
+    if len(nearest) != 1:
+        return []
+    return nearest
 
 
 def build_hoist_outcomes(document, calculation, topology_constructions=None):
@@ -65,21 +96,78 @@ def build_hoist_outcomes(document, calculation, topology_constructions=None):
             associated_result = next((item for item in calculation.get(
                 "constructions", []) if attached_construction is not None and
                 item.get("construction_id") == attached_construction.id), None)
+            direct_loads = _direct_loads_for_free_hoist(support, document)
+            if direct_loads:
+                # A free hoist is not a solved construction. Its palette and
+                # report outcome must show the user-maintained Vectorworks
+                # mass, not an analysis-only safety-factor variant.
+                direct_mass = sum(
+                    item.unfactored_weight_kg
+                    if item.unfactored_weight_kg is not None else item.weight_kg
+                    for _, item in direct_loads)
+                outcome = {
+                    "support_id": support.id,
+                    "hoist_id": support.hoist_id,
+                    "status": "direct_geometry_load",
+                    "construction_id": "",
+                    "reaction_mass_kg": direct_mass,
+                    "high_hook_mass_kg": (
+                        direct_mass + (support.weight_with_chain_raw_kg or
+                                       support.weight_with_chain_kg)),
+                    "writeback_eligible": False,
+                    "reason": "direct_free_hoist_load_geometry",
+                    "direct_load_evidence": [{
+                        "load_id": item.id, "record_type": item.record_type,
+                        "mass_kg": item.weight_kg,
+                        "distance_mm": distance,
+                    } for distance, item in direct_loads],
+                }
+                outcomes.append(outcome)
+                continue
+            if support.manual_load_raw_kg > 0.0 or support.manual_load_kg > 0.0:
+                manual_mass = (support.manual_load_raw_kg or
+                               support.manual_load_kg)
+                outcome = {
+                    "support_id": support.id,
+                    "hoist_id": support.hoist_id,
+                    "status": "manual_direct_load",
+                    "construction_id": "",
+                    "reaction_mass_kg": manual_mass,
+                    "high_hook_mass_kg": (
+                        manual_mass + (support.weight_with_chain_raw_kg or
+                                       support.weight_with_chain_kg)),
+                    "writeback_eligible": False,
+                    "reason": "manual_roof_force_no_deadload_weight",
+                    "manual_input_field": "RoofForceNoDeadloadWeight",
+                }
+                outcomes.append(outcome)
+                continue
             reason = diagnostic.get("reason")
             if reason is None and associated_result is not None:
                 reason = ("; ".join(associated_result.get("issues", [])) or
                           "construction_not_calculated")
             if reason is None:
                 reason = "no_viable_carrier"
+            # A hoist with no carrier, nearby load, or manual load is not an
+            # error. Leave its user-managed Vectorworks values untouched.
+            has_no_nearby_carrier = (
+                attached is None and
+                (not diagnostic.get("nearest_3d") or
+                 diagnostic["nearest_3d"].get(
+                     "carrier_clearance_mm", 0.0) >
+                 config.ATTACHMENT_SEARCH_RADIUS_MM))
+            status = ("exempt_not_connected" if has_no_nearby_carrier else
+                      "zero_not_calculated")
             outcome = {
                 "support_id": support.id,
                 "hoist_id": support.hoist_id,
-                "status": "zero_not_calculated",
+                "status": status,
                 "construction_id": "",
                 "reaction_mass_kg": 0.0,
                 "high_hook_mass_kg": 0.0,
                 "writeback_eligible": False,
-                "reason": reason,
+                "reason": ("exempt_not_connected" if
+                           status == "exempt_not_connected" else reason),
                 "association_diagnostic": diagnostic,
             }
             if attached is not None:

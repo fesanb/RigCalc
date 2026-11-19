@@ -11,6 +11,8 @@ class PointLoad:
     position: Point3D
     record_type: str
     weight_kg: Optional[float] = None
+    # Source mass before any calculation-only safety factor is applied.
+    unfactored_weight_kg: Optional[float] = None
     weight_raw: Any = None
     raw_fields: Dict[str, str] = field(default_factory=dict, repr=False)
     source_ref: Any = field(default=None, repr=False)

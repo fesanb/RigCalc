@@ -9,6 +9,10 @@ ATTACHMENT_WARNING_DISTANCE_MM = 500.0
 # because it is the nearest object in the drawing.
 ATTACHMENT_SEARCH_RADIUS_MM = 500.0
 ATTACHMENT_EXACT_DISTANCE_MM = 50.0
+# A free hoist can carry an explicitly modelled point load without a truss.
+# Keep this deliberately small: this is a direct pickup, not a substitute for
+# resolving a carrier association.
+DIRECT_HOIST_LOAD_DISTANCE_MM = 500.0
 
 REPORT_BASENAME = "rigcalc_geometry"
 

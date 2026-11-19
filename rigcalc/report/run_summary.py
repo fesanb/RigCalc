@@ -30,7 +30,10 @@ def build_run_summary(document, constructions, primary, writeback,
         for item in result.get("items", [])
         if item.get("status") != "written"]
     unassigned_hoists = [item for item in document.unassigned_supports
-                         if item.support_kind == "hoist"]
+                         if (item.support_kind == "hoist" and
+                             next((outcome for outcome in hoist_outcomes
+                                   if outcome.get("support_id") == item.id),
+                                  {}).get("status") == "zero_not_calculated")]
     unassigned_dead_hangs = [item for item in document.unassigned_supports
                              if item.support_kind == "dead_hang"]
     unassigned = {
@@ -59,6 +62,15 @@ def build_run_summary(document, constructions, primary, writeback,
                                    for item in hoist_outcomes),
             "zero_not_calculated": sum(
                 item.get("status") == "zero_not_calculated"
+                for item in hoist_outcomes),
+            "direct_geometry_load": sum(
+                item.get("status") == "direct_geometry_load"
+                for item in hoist_outcomes),
+            "manual_direct_load": sum(
+                item.get("status") == "manual_direct_load"
+                for item in hoist_outcomes),
+            "exempt_not_connected": sum(
+                item.get("status") == "exempt_not_connected"
                 for item in hoist_outcomes),
         },
         "found": {

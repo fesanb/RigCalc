@@ -150,12 +150,12 @@ def default_cross_section_roots():
     program_files = os.environ.get("ProgramFiles")
     if program_files:
         candidates.append(os.path.join(
-            program_files, "Vectorworks 2026", "Plug-Ins", "VW_Spotlight",
+            program_files, "Vectorworks 2027", "Plug-Ins", "VW_Spotlight",
             "Data", "Braceworks", "TrussCrossSectionData"))
     appdata = os.environ.get("APPDATA")
     if appdata:
         user_base = os.path.join(
-            appdata, "Nemetschek", "Vectorworks", "2026")
+            appdata, "Nemetschek", "Vectorworks", "2027")
         candidates.extend([
             os.path.join(user_base, "Plug-Ins", "VW_Spotlight", "Data",
                          "Braceworks", "TrussCrossSectionData"),
