@@ -6,7 +6,8 @@ from .scanner import scan_document
 from .inventory import scan_plugin_inventory
 from .hanging_position import extract_hanging_position_trusses
 from .hoist_ids import populate_missing_hoist_ids
-from .layer_dialog import choose_calculation_scope
+from .layer_dialog import choose_calculation_scope, scope_from_palette_request
+from .palette_bridge import consume_run_request
 from .writer import report_output_directory, write_reports
 from .progress import RigCalcCancelled, VWProgress
 
@@ -35,8 +36,10 @@ def run(vs_module=None):
         display.close()
         return None
     display.close()
-    scope = choose_calculation_scope(
-        vs_module, inventory, report_output_directory())
+    output_dir = report_output_directory(vs_module)
+    scope = scope_from_palette_request(output_dir, consume_run_request())
+    if scope is None:
+        scope = choose_calculation_scope(vs_module, inventory, output_dir)
     if scope is None:
         return None
     included_layers = scope["selected"]

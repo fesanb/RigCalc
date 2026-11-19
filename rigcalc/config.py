@@ -16,8 +16,9 @@ DIRECT_HOIST_LOAD_DISTANCE_MM = 500.0
 
 REPORT_BASENAME = "rigcalc_geometry"
 
-# Development output lives beside the package so reports can be inspected
-# directly from the shared repository after a Vectorworks run.
+# Fallback report directory beside the package, used only when the active
+# drawing has never been saved. Saved drawings write to their own
+# "<drawing>.rigcalc/latest" project store (see rigcalc/vw/project_store.py).
 OUTPUT_DIRECTORY_NAME = "output"
 
 # Full PIO records/nested diagnostics are expensive and are not required by

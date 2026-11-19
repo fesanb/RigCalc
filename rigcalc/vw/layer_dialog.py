@@ -3,6 +3,8 @@
 import json
 import os
 
+from .palette_bridge import read_pending_settings
+
 
 RELEVANT_RECORDS = {
     "TrussItem", "BrxHoist", "BrxCustomTrussCross", "BrxGenericWeight",
@@ -44,6 +46,31 @@ def _write_selection(path, selected, cable_load_kg_m=0.0,
             }, stream, ensure_ascii=False, indent=2)
     except OSError:
         pass
+
+
+def scope_from_palette_request(output_dir, request):
+    """Reuse an already reviewed layer scope for a palette-started run.
+
+    A new document or an empty saved scope intentionally falls back to the
+    established Vectorworks setup dialog instead of guessing its layers.
+    """
+    if not request.get("run_from_palette"):
+        return None
+    values = _read_previous_values(os.path.join(
+        output_dir, "rigcalc_layer_selection.json"))
+    layers = values.get("included_layers") or []
+    if not layers:
+        return None
+    settings = read_pending_settings()
+    return {
+        "selected": layers,
+        "cable_load_kg_m": _parse_number(
+            settings.get("cable_load_kg_m"),
+            values.get("cable_load_kg_m", 0.0)),
+        "safety_factor": _parse_number(
+            settings.get("safety_factor"),
+            values.get("safety_factor", 1.0), strictly_positive=True),
+    }
 
 
 def _checkbox_state(value):
@@ -102,6 +129,12 @@ def choose_calculation_scope(vs, inventory, output_dir):
 
     selection_path = os.path.join(output_dir, "rigcalc_layer_selection.json")
     previous_values = _read_previous_values(selection_path)
+    # Palette values are explicit choices for the next calculation. They only
+    # prefill the established setup dialog; layer scope remains reviewable.
+    previous_values.update({
+        key: value for key, value in read_pending_settings().items()
+        if key in ("cable_load_kg_m", "safety_factor")
+    })
     previous_layers = set(previous_values.get("included_layers", []))
     context = preflight_context(vs, inventory, previous_layers)
     dialog = vs.CreateLayout(
@@ -145,9 +178,9 @@ def choose_calculation_scope(vs, inventory, output_dir):
         "Cable load follows the physical length of every line truss. The "
         "global safety factor is applied once to every scanned load.", 76)
     vs.CreateStaticText(dialog, cable_label_id, "Cable load (kg/m)", 24)
-    vs.CreateEditText(dialog, cable_edit_id, "0,00", 10)
+    vs.CreateEditText(dialog, cable_edit_id, "2,00", 10)
     vs.CreateStaticText(dialog, factor_label_id, "Safety factor", 24)
-    vs.CreateEditText(dialog, factor_edit_id, "1,00", 10)
+    vs.CreateEditText(dialog, factor_edit_id, "1,20", 10)
     vs.CreateStaticText(
         dialog, review_heading_id,
         "--- 3. REVIEW --------------------------------------------", 76)
@@ -182,7 +215,7 @@ def choose_calculation_scope(vs, inventory, output_dir):
     vs.SetBelowItem(dialog, review_id, disclaimer_id, 0, 2)
 
     result = {
-        "selected": [], "cable_load_kg_m": 0.0, "safety_factor": 1.0}
+        "selected": [], "cable_load_kg_m": 2.0, "safety_factor": 1.2}
 
     def handler(item, data):
         if item == 12255:  # SetupDialogC
@@ -193,10 +226,10 @@ def choose_calculation_scope(vs, inventory, output_dir):
             vs.SetItemText(
                 dialog, cable_edit_id,
                 _display_number(
-                    previous_values.get("cable_load_kg_m"), 0.0))
+                    previous_values.get("cable_load_kg_m"), 2.0))
             vs.SetItemText(
                 dialog, factor_edit_id,
-                _display_number(previous_values.get("safety_factor"), 1.0))
+                _display_number(previous_values.get("safety_factor"), 1.2))
         elif item == 1:
             # Read controls before Vectorworks destroys the closed dialog.
             result["selected"] = [
@@ -204,9 +237,9 @@ def choose_calculation_scope(vs, inventory, output_dir):
                 if _checkbox_state(vs.GetBooleanItem(
                     dialog, first_checkbox_id + index))]
             result["cable_load_kg_m"] = _parse_number(
-                vs.GetItemText(dialog, cable_edit_id), 0.0)
+                vs.GetItemText(dialog, cable_edit_id), 2.0)
             result["safety_factor"] = _parse_number(
-                vs.GetItemText(dialog, factor_edit_id), 1.0,
+                vs.GetItemText(dialog, factor_edit_id), 1.2,
                 strictly_positive=True)
 
     if vs.RunLayoutDialog(dialog, handler) != 1:

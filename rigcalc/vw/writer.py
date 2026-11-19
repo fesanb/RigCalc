@@ -9,16 +9,30 @@ from rigcalc.report import (build_run_summary, make_calculation_text,
                             make_hoist_outcomes_text, make_text_report,
                             build_hoist_outcomes,
                             write_json_report)
+from rigcalc.palette import build_history, build_palette_run
 from rigcalc.solver import (calculate_corotational_reactions,
                             calculate_reactions, compare_calculations,
                             make_comparison_text, select_primary_calculation)
 from .hoist_writeback import write_high_hook_values
 from .notifications import write_notification_markers
+from .palette_session import set_active_palette_run
+from .palette_bridge import write_json_atomic
+from .project_store import archive_latest, ensure_project, document_path, project_root
 from .truss_cross_writeback import write_truss_cross_forces
-from .summary_dialog import show_run_summary_dialog
 
 
-def report_output_directory():
+def report_output_directory(vs=None):
+    """Return where this run's reports are written.
+
+    A saved drawing uses its project store, ``<drawing>.rigcalc/latest``,
+    which is archived to ``runs/<UTC timestamp>`` after a completed run.  An
+    unsaved drawing falls back to the repository's development ``output``
+    directory; the SDK palette cannot show results for such a drawing.
+    """
+    if vs is not None:
+        project_latest = ensure_project(vs)
+        if project_latest:
+            return project_latest
     rigcalc_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     return os.path.join(rigcalc_root, config.OUTPUT_DIRECTORY_NAME)
 
@@ -28,7 +42,7 @@ def write_reports(vs, document, constructions, inventory=None,
                   cable_load_kg_m=0.0,
                   safety_factor=1.0,
                   hoist_id_assignment=None):
-    output_dir = report_output_directory()
+    output_dir = report_output_directory(vs)
     os.makedirs(output_dir, exist_ok=True)
     with open(os.path.join(output_dir, "rigcalc_hoist_ids.json"),
               "w", encoding="utf-8") as stream:
@@ -181,6 +195,13 @@ def write_reports(vs, document, constructions, inventory=None,
         stream.write(make_hoist_outcomes_text(hoist_outcomes))
     notifications = (evaluate_notifications(primary) +
                      evaluate_zero_hoist_outcomes(hoist_outcomes))
+    palette_run = build_palette_run(
+        document, primary, hoist_outcomes, notifications,
+        calculation_settings=settings,
+        document_context={"path": document_path(vs), "project_root": project_root(vs)})
+    palette_run.snapshot["history"] = build_history(
+        palette_run.snapshot, project_root(vs))
+    set_active_palette_run(palette_run)
     with open(os.path.join(output_dir, "rigcalc_notifications.json"),
               "w", encoding="utf-8") as stream:
         json.dump({"notifications": notifications}, stream,
@@ -216,5 +237,12 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(os.path.join(output_dir, "rigcalc_run_summary.json"),
               "w", encoding="utf-8") as stream:
         json.dump(summary, stream, ensure_ascii=False, indent=2)
-    show_run_summary_dialog(vs, summary)
+    # The web palette owns the interactive presentation.  Publish the
+    # completed summary with the result snapshot so it can be reopened later.
+    # The SDK palette reads this exact file from the project store, so it is
+    # replaced atomically.
+    palette_run.snapshot["run_summary"] = summary
+    write_json_atomic(palette_run.snapshot,
+                      os.path.join(output_dir, "rigcalc_palette.json"))
+    archive_latest(vs)
     return text_path, json_path
