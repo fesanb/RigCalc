@@ -6,6 +6,14 @@ All notable changes to RigCalc are documented in this file.
 
 ### Added
 
+- Dockable Vectorworks 2027 palette (C++ SDK plug-in, `sdk/`) with motor
+  list, warnings, run history, calculation settings, motor ID editing and
+  show-in-drawing.
+- Per-drawing project store, `<drawing>.rigcalc/`, with `latest/` reports and
+  an immutable copy of every completed run in `runs/`.
+- Tension-only hoist cable modelling.
+- `AGENTS.md` project rules shared by all AI coding assistants, and
+  `docs/data-locations.md` listing every file RigCalc reads or writes.
 - Linear continuous-beam analysis and corotational 3D frame analysis.
 - Solver-result comparison and selection of a validated primary calculation.
 - Mechanical cross sections from Vectorworks XML, including capacity data.
@@ -30,6 +38,19 @@ All notable changes to RigCalc are documented in this file.
   issues.
 - Generated reports now include calculations, solver comparison, and
   writeback results.
+
+- Reports for a saved drawing go to its project store; the repository's
+  `output/` folder is only a fallback for unsaved drawings.
+- SDK build output moved out of the shared Dropbox folder to
+  `%LOCALAPPDATA%\RigCalc\SdkBuild`.
+
+### Removed
+
+- Unused run-summary dialog (the palette shows the run summary).
+- Unused palette snapshot copy in `%APPDATA%`, the SDK protocol prototype, and
+  leftover files from the Vectorworks SDK sample project, including the
+  non-building Xcode project.
+- Cursor-specific rule files, replaced by `AGENTS.md`.
 
 ### Security
 

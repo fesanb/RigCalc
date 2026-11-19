@@ -1,7 +1,8 @@
 """RIGCALC VECTORWORKS LOADER
 
-Copy the complete contents of this file into a Python Script resource in
-Vectorworks. Normally, only RIGCALC_REPO_DIR needs to be changed.
+Copy the complete contents of this file into the Vectorworks menu command
+plug-in named exactly "RigCalc" (see README, "Installing in Vectorworks").
+Normally, only RIGCALC_REPO_DIR needs to be changed.
 """
 
 import importlib

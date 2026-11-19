@@ -31,9 +31,8 @@ def run():
         probe = importlib.import_module("rigcalc.vw.write_probe")
         probe.run(vs)
     except Exception:
-        error_dir = os.path.join(RIGCALC_REPO_DIR, "output")
-        if not os.path.isdir(RIGCALC_REPO_DIR):
-            error_dir = os.path.join(tempfile.gettempdir(), "VWDEV")
+        # Same location as loader.py: %TEMP%\VWDEV
+        error_dir = os.path.join(tempfile.gettempdir(), "VWDEV")
         os.makedirs(error_dir, exist_ok=True)
         error_path = os.path.join(error_dir, "rigcalc_write_test_error.txt")
         with open(error_path, "w", encoding="utf-8") as stream:

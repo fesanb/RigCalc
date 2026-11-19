@@ -3,6 +3,9 @@
 RigCalc is in an early experimental phase. Small, focused issues and pull
 requests are welcome.
 
+The project rules for contributors and AI coding assistants are in
+[AGENTS.md](AGENTS.md).
+
 ## Before submitting a change
 
 1. Open an issue for substantial behavioral or architectural changes.
@@ -13,6 +16,9 @@ requests are welcome.
    ```powershell
    python -B -m unittest discover -s tests -v
    ```
+
+   Write tests as `unittest.TestCase` classes. Bare pytest-style functions
+   are not collected and never run.
 
 5. If dependency metadata changes, verify the lock file with `uv lock --check`.
 6. Run `git diff --check` and keep generated reports, Vectorworks drawings,

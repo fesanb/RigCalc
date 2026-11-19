@@ -37,66 +37,39 @@ or an explicit `0.00 kN` outcome with a clear drawing and report reason.
 > basis for safety-critical rigging or lifting decisions. Calculations and
 > assumptions must be reviewed by qualified personnel.
 
-## Migration from LoadCalc
+## Installing in Vectorworks
 
-The product directory and Python package have been renamed:
+RigCalc has two parts in Vectorworks. Both are needed on every machine.
 
-```text
-LoadCalc/          -> RigCalc/
-loadcalc/          -> rigcalc/
-loadcalc_geometry  -> rigcalc_geometry
-```
+### 1. The `RigCalc` menu command (Python)
 
-An old Vectorworks loader will not work after this change. Copy the complete
-new `RigCalc/loader.py` into the Vectorworks script and verify that
-`RIGCALC_REPO_DIR` points to the new `RigCalc` directory. This is a one-time
-update.
+The source code stays in this repository; Vectorworks only holds a small
+loader, [`loader.py`](loader.py), as a menu command plug-in:
 
-## Vectorworks loader
+1. Open **Tools > Plug-ins > Plug-in Manager** and create a new
+   **Menu Command** named exactly `RigCalc`, with Python as its language.
+   The palette's **Calculate** button runs the command by that name, so it must
+   not be renamed. It is saved as
+   `%APPDATA%\Nemetschek\Vectorworks\2027\Plug-ins\RigCalc.vsm`.
+2. Paste the complete contents of `loader.py` as its script.
+3. Set `RIGCALC_REPO_DIR` near the top to this repository's folder, the one
+   that contains `rigcalc/` and `loader.py`, not `rigcalc/` itself:
 
-The complete loader is located at:
+   ```python
+   RIGCALC_REPO_DIR = (
+       r"C:\Path\To\RigCalc"
+   )
+   ```
 
-```text
-RigCalc/loader.py
-```
+4. Add the command to the workspace if it should appear in a menu.
 
-This is the only project file that should be copied into the Vectorworks
-Resource Manager. The RigCalc source code remains external in the Git
-repository.
+The loader validates the path and shows a clear error if
+`rigcalc/__init__.py` cannot be found.
 
-### Installing the loader
+### 2. The RigCalc palette (C++ SDK plug-in)
 
-1. Open `RigCalc/loader.py` in a text editor.
-2. Copy the entire file.
-3. Create or open a Python Script resource in the Vectorworks Resource Manager.
-4. Replace the existing script contents with the loader and save it.
-5. Change `RIGCALC_REPO_DIR` near the top of the loader if the repository is
-   stored elsewhere on the machine.
-
-Example:
-
-```python
-RIGCALC_REPO_DIR = (
-    r"C:\Path\To\RigCalc"
-)
-```
-
-The path must point to the directory containing `rigcalc/`, `loader.py`, and
-this README:
-
-```text
-VWDEV/
-└── RigCalc/                  <-- RIGCALC_REPO_DIR points here
-    ├── loader.py
-    ├── README.md
-    ├── rigcalc/
-    │   └── __init__.py
-    ├── output/
-    └── tests/
-```
-
-Do not point it at `VWDEV` alone or at `RigCalc/rigcalc`. The loader validates
-the path and displays a clear error if `rigcalc/__init__.py` cannot be found.
+Build and deploy `sdk/vw2027/RigCalcPalette` as described in
+[`sdk/README.md`](sdk/README.md). It adds **Tools > RigCalc > Open RigCalc**.
 
 ## Development workflow
 
@@ -104,7 +77,7 @@ After installing the loader once:
 
 1. Edit files under `RigCalc/rigcalc/` in VS Code.
 2. Save the changes.
-3. Run the RigCalc script from Vectorworks.
+3. Run the `RigCalc` command, or **Calculate** in the palette.
 4. The loader clears the import cache and runs the latest saved code.
 
 Vectorworks normally does not need to be restarted, and the loader does not
@@ -117,35 +90,55 @@ Before writing reports, RigCalc displays a dialog containing the
 calculation-relevant design layers. Only selected layers are included in the
 geometry model. Select layers containing suspended structures and equipment,
 and leave floor, storage, venue, and presentation layers disabled. The last
-selection is remembered as a suggestion for the next run, but the dialog is
-always displayed.
+selection is remembered as a suggestion for the next run. A run started from
+the palette's **Calculate** button reuses the remembered layers and skips the
+dialog; if no layers have been chosen yet for the drawing, the dialog is shown.
 
-A successful run writes the following files without opening Notepad:
+A successful run writes its reports into the drawing's project store, a
+`.rigcalc` folder next to the saved drawing:
 
 ```text
-RigCalc/output/rigcalc_geometry.txt
-RigCalc/output/rigcalc_geometry.json
-RigCalc/output/rigcalc_cross_sections.json
-RigCalc/output/rigcalc_calculation.txt
-RigCalc/output/rigcalc_calculation.json
-RigCalc/output/rigcalc_nonlinear_calculation.txt
-RigCalc/output/rigcalc_nonlinear_calculation.json
-RigCalc/output/rigcalc_solver_comparison.txt
-RigCalc/output/rigcalc_solver_comparison.json
-RigCalc/output/rigcalc_primary_calculation.txt
-RigCalc/output/rigcalc_primary_calculation.json
-RigCalc/output/rigcalc_hoist_ids.json
-RigCalc/output/rigcalc_hoist_outcomes.txt
-RigCalc/output/rigcalc_hoist_outcomes.json
-RigCalc/output/rigcalc_writeback.json
-RigCalc/output/rigcalc_truss_cross_writeback.json
-RigCalc/output/rigcalc_notifications.json
-RigCalc/output/rigcalc_notification_writeback.json
-RigCalc/output/rigcalc_run_summary.json
+Show.vwx
+Show.rigcalc/
+├── manifest.json
+├── latest/      reports from the most recent run
+└── runs/        an immutable copy of latest/ for every completed run
+```
+
+An unsaved drawing writes to `RigCalc/output/` instead; that fallback is for
+development only. [`docs/data-locations.md`](docs/data-locations.md) lists
+every location RigCalc reads or writes.
+
+Each run writes these files to `latest/`, without opening Notepad:
+
+```text
+rigcalc_geometry.txt / .json
+rigcalc_cross_sections.json
+rigcalc_calculation.txt / .json
+rigcalc_nonlinear_calculation.txt / .json
+rigcalc_solver_comparison.txt / .json
+rigcalc_primary_calculation.txt / .json
+rigcalc_hoist_ids.json
+rigcalc_hoist_outcomes.txt / .json
+rigcalc_layer_selection.json
+rigcalc_palette.json
+rigcalc_writeback.json
+rigcalc_truss_cross_writeback.json
+rigcalc_notifications.json
+rigcalc_notification_writeback.json
+rigcalc_run_summary.json
 ```
 
 The TXT files are intended for quick human review. The JSON files contain the
 detailed model for analysis and testing.
+
+`rigcalc_palette.json` is the stable, user-interface-facing result snapshot.
+It contains one row per discovered hoist, including High Hook and lower-hook
+loads, contributing load evidence, result status, and visible warnings. It
+never contains Vectorworks object handles. The SDK palette
+(`Tools > RigCalc > Open RigCalc`, see
+[`docs/vectorworks-palette.md`](docs/vectorworks-palette.md)) reads it from
+`latest/` and resolves objects by UUID in the open drawing.
 
 When development diagnostics are enabled, RigCalc also writes
 `rigcalc_inventory.json` and `rigcalc_normalized.json`.
@@ -170,12 +163,13 @@ During execution, Vectorworks displays progress for layer indexing, model
 construction, linear analysis, and nonlinear analysis. The nonlinear phase
 shows the construction, load percentage, and Newton iteration.
 
-After the run, Vectorworks displays a summary with object counts, calculated
+After the run, `rigcalc_run_summary.json` holds object counts, calculated
 constructions, writeback results, released hoist supports, and objects that
-could not be processed.
+could not be processed. The same summary is embedded in the palette snapshot.
 
-Generated TXT and JSON reports are ignored by Git. `output/.gitkeep` ensures
-that the output directory exists after cloning.
+Project stores live beside the drawings, outside the repository. Generated
+files in `output/` are ignored by Git; `output/.gitkeep` keeps the folder
+after cloning.
 
 ## Troubleshooting
 
@@ -185,7 +179,9 @@ A loader or RigCalc failure writes the complete traceback to:
 %TEMP%\VWDEV\rigcalc_error.txt
 ```
 
-Vectorworks displays only a short error message with the path to this file.
+The isolated hoist write test (`write_test_loader.py`) uses
+`%TEMP%\VWDEV\rigcalc_write_test_error.txt`. Vectorworks displays only a short
+error message with the path to this file.
 First verify that `RIGCALC_REPO_DIR` points to the correct `RigCalc` directory.
 
 ## Architecture
@@ -229,6 +225,10 @@ unsupported rather than analysed by the beam solver.
 The implementation roadmap for every in-scope geometry is maintained in
 [`docs/solver-roadmap.md`](docs/solver-roadmap.md). An unsupported result is a
 tracked implementation gap, never an accepted product-scope exclusion.
+
+The required Vectorworks evidence before closing policy-aligned implementation
+work is captured in
+[`docs/vectorworks-final-run-validation.md`](docs/vectorworks-final-run-validation.md).
 
 The linear and corotational analyses are compared before a primary result is
 selected. The corotational solver is diagnostic-only until it implements the
@@ -292,10 +292,10 @@ moment.
 ## Running tests
 
 From the `RigCalc` directory, using the Python runtime bundled with
-Vectorworks 2026:
+Vectorworks 2027:
 
 ```powershell
-& 'C:\Program Files\Vectorworks 2026\Python39\python.exe' -B -m unittest discover -s tests -v
+& 'C:\Program Files\Vectorworks 2027\Python314\python.exe' -B -m unittest discover -s tests -v
 ```
 
 `-B` prevents the tests from creating `__pycache__` files in the repository.

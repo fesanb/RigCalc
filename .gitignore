@@ -27,7 +27,6 @@ Thumbs.db
 # and are too large for the source repository.
 VW_Testfiles/
 
-# Project-wide Codex/Cursor rules are source-controlled team guidance.
-!.cursor/
-!.cursor/rules/
-!.cursor/rules/*.mdc
+# Project rules for AI assistants live in AGENTS.md. Tool-specific rule
+# folders are personal and must not override it.
+.cursor/
