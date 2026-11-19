@@ -1,0 +1,5 @@
+# The vendor's SDK and its generated Visual Studio build files are local.
+vendor/
+build/
+.vs/
+x64/

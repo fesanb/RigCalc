@@ -6,3 +6,18 @@
 *.yaml text eol=lf
 *.json text eol=lf
 *.txt text eol=lf
+*.mdc text eol=lf
+*.html text eol=lf
+*.cpp text eol=crlf
+*.h text eol=crlf
+*.plist text eol=lf
+*.pbxproj text eol=lf
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.filters text eol=crlf
+*.ps1 text eol=crlf
+# Vectorworks string tables are UTF-16; never convert them.
+*.vwstrings binary
+*.vlb binary
+*.vwr binary
+*.vsm binary

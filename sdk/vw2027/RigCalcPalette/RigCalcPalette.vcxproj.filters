@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{8fbaf1a3-d844-477c-9a18-ebf6b4612403}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Prefix">
+      <UniqueIdentifier>{54103ef0-2cad-4ab8-af71-a361f0429ab0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\RigCalc">
+      <UniqueIdentifier>{2c1d7e52-6a43-4f0e-9b7a-3d5e1f9a8c21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RigCalcPalette.vwr">
+      <UniqueIdentifier>{345181fc-2199-4a21-bfb6-86a1d332c6de}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\ModuleMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\RigCalc\ExtMenuOpenRigCalc.cpp">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\RigCalc\ExtWebPaletteRigCalc.cpp">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\RigCalc\PaletteSnapshotProvider.cpp">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Prefix\StdAfx.cpp">
+      <Filter>Source Files\Prefix</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Source\RigCalc\ExtMenuOpenRigCalc.h">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\RigCalc\ExtWebPaletteRigCalc.h">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\RigCalc\PaletteSnapshotProvider.h">
+      <Filter>Source Files\RigCalc</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Prefix\CommonPrefix.h">
+      <Filter>Source Files\Prefix</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Prefix\StdAfx.h">
+      <Filter>Source Files\Prefix</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
