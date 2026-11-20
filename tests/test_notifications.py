@@ -112,6 +112,20 @@ class NotificationEvaluationTests(unittest.TestCase):
 
 
 
+class HoistStateNotificationTests(unittest.TestCase):
+    def test_slack_chain_and_rotation_are_marked(self):
+        from rigcalc.notifications import evaluate_hoist_states
+        value = calculation(reaction(120, 250, "H1"), reaction(0, 250, "H2"))
+        construction = value["constructions"][0]
+        construction["reactions"][1]["support_active"] = False
+        construction["issues"] = ["rig_rotates_about_support_line"]
+        items = evaluate_hoist_states(value)
+        types = sorted((item["type"], item["support_id"]) for item in items)
+        self.assertIn(("slack_chain", "H2"), types)
+        self.assertIn(("rig_rotation", "H1"), types)
+        self.assertTrue(any("SLACK CHAIN" in item["message"] for item in items))
+
+
 class FakeVS:
     def __init__(self):
         self.classes = {"None", "RigCalc-Load"}

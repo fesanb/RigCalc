@@ -241,10 +241,13 @@ High Hook writeback requires a validated tension-only support state. For level
 open chains the hoist contact states are enumerated exhaustively (up to eight
 hoists): a released chain must be slack, meaning its pickup rises, and every
 engaged chain must carry a non-negative reaction. High Hook is the truss
-reaction plus `WeightWithChain`; a slack hoist's High Hook is its
-`WeightWithChain` alone, and slack hoists are not written back. Inclined chains
-remain diagnostic and read-only. Forces in eligible structural Truss Cross
-connections are written back in newtons.
+reaction plus `WeightWithChain`; a slack chain is written back as `0.00` and
+marked with a SLACK CHAIN warning. All other geometry (inclined, vertical,
+curved, cornered, branched, closed, 3D) uses the general 3D frame model with
+the same tension-only rules. A rig on one or two hoists that would rotate
+about its support line is written back from rigid-body statics with a ROTATES
+warning. Forces in eligible structural Truss Cross connections are written
+back in newtons.
 
 The diagnostic corotational branch models distributed mass as a fixed global
 vertical gravity load based on the undeformed station geometry; it is not a

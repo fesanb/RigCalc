@@ -128,6 +128,10 @@ def build_run_summary(document, constructions, primary, writeback,
                 item.get("class_name") == "RigCalc-Internal" and
                 item.get("severity") == "error"
                 for item in notifications),
+            "slack_chains": sum(item.get("type") == "slack_chain"
+                                for item in notifications),
+            "rotating_rig_hoists": sum(item.get("type") == "rig_rotation"
+                                       for item in notifications),
         },
         "uncalculated_constructions": {
             "count": len(uncalculated_ids),
@@ -158,7 +162,9 @@ def make_run_summary_text(summary):
     status = "REVIEW REQUIRED" if (
         errors["count"] or uncalculated.get("count", 0) or
         unhandled["count"] or notifications.get("load_errors", 0) or
-        notifications.get("internal_errors", 0)) else "COMPLETE"
+        notifications.get("internal_errors", 0) or
+        notifications.get("slack_chains", 0) or
+        notifications.get("rotating_rig_hoists", 0)) else "COMPLETE"
     return (
         "RIGCALC  /  RUN SUMMARY\n"
         "Status: {}\n\n"
@@ -183,6 +189,8 @@ def make_run_summary_text(summary):
         "Load errors: {}\n"
         "Deflection markers: {}\n"
         "Internal-force errors: {}\n"
+        "Slack chains (High Hook 0.00): {}\n"
+        "Hoists on rotating rigs: {}\n"
         "Technical errors: {}\n"
         "Writeback-blocking reasons: {}\n"
         "Uncalculated constructions: {}\n"
@@ -207,7 +215,9 @@ def make_run_summary_text(summary):
         calculated["released_motor_supports"],
         notifications.get("load_errors", 0),
         notifications.get("deflections", 0),
-        notifications.get("internal_errors", 0), errors["count"],
+        notifications.get("internal_errors", 0),
+        notifications.get("slack_chains", 0),
+        notifications.get("rotating_rig_hoists", 0), errors["count"],
         len(blocking_issues),
         uncalculated.get("count", 0),
         unhandled["count"], unhandled["hoists"],

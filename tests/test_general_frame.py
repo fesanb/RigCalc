@@ -223,14 +223,29 @@ class GeometryBenchmarkTests(unittest.TestCase):
         for value in reactions(result).values():
             self.assertAlmostEqual(value, 60.0, delta=0.05)
 
-    def test_two_hoists_cannot_stabilise_an_l_frame(self):
+    def test_l_frame_on_two_hoists_rotates_with_exact_reactions(self):
         _, result, _ = solve(
             [line("A", (0, 0, 0), (6000, 0, 0), 60),
              line("B", (6000, 0, 0), (6000, 4000, 0), 40)],
             [hoist("H1", (0, 0, 0)), hoist("H2", (6000, 4000, 0))])
-        self.assertFalse(result["writeback_eligible"])
-        self.assertIn("lateral_or_roll_stability_not_provided_by_supports",
-                      result["issues"])
+        # The frame rotates about the H1-H2 line; vertical reactions follow
+        # from moments along that line (centroids of A and B projected).
+        span = (6000.0**2+4000.0**2)**0.5
+        ux, uy = 6000.0/span, 4000.0/span
+        r2 = (60.0*3000.0*ux+40.0*(6000.0*ux+2000.0*uy))/span
+        values = reactions(result)
+        self.assertAlmostEqual(values["H2"], r2, delta=0.01)
+        self.assertAlmostEqual(values["H1"], 100.0-r2, delta=0.01)
+        self.assertIn("rig_rotates_about_support_line", result["issues"])
+        self.assertTrue(result["writeback_eligible"])
+        self.assertEqual(result["element_forces"], [])
+
+    def test_single_hoist_off_centre_carries_everything(self):
+        _, result, _ = solve([line("T", (0, 0, 0), (6000, 0, 0), 60)],
+                             [hoist("H1", (2000, 0, 0))],
+                             [load("P", (5000, 0, 0), 40)])
+        self.assertAlmostEqual(reactions(result)["H1"], 100.0, delta=0.01)
+        self.assertIn("rig_rotates_about_support_line", result["issues"])
 
 
 class VerticalPickupTests(unittest.TestCase):

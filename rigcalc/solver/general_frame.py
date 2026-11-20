@@ -344,6 +344,7 @@ def solve_general_frame(construction, loads=None):
                 "E{:05d}".format(len(elements)), node_a, node_b, section,
                 None, None, None, "joint_link"))
     corner_nodes = {}
+    corner_arms = {}
     for corner in corners:
         links = corner_links[corner.id]
         if not links:
@@ -364,6 +365,8 @@ def solve_general_frame(construction, loads=None):
             center = centroid
         corner_node = new_node(center)
         corner_nodes[corner.id] = corner_node
+        corner_arms[corner.id] = [_distance(center, (end.x, end.y, end.z))
+                                  for end in ends]
         parent[corner_node.id] = corner_node.id
         for (member_id, _), end in zip(links, ends):
             gap = _distance(center, (end.x, end.y, end.z))
@@ -450,6 +453,21 @@ def solve_general_frame(construction, loads=None):
                 "truss_id": corner.id,
                 "position_mm": [node.x, node.y, node.z],
                 "evidence": "TrussItem.Weight",
+            })
+        cable_m = _corner_cable_length_mm(
+            corner, corner_arms.get(corner.id, []))/1000.0
+        if (corner.cable_load_kg_m > 0.0 and cable_m > 0.0 and
+                corner.id in corner_nodes):
+            mass = corner.cable_load_kg_m*cable_m
+            add_node_load(corner_nodes[corner.id], mass)
+            node = rep(corner_nodes[corner.id])
+            load_records.append({
+                "source_id": "{}:cable".format(corner.id),
+                "source_type": "cable_flat_rate", "mass_kg": mass,
+                "station_mm": 0.0, "truss_id": corner.id,
+                "cable_length_m": cable_m,
+                "position_mm": [node.x, node.y, node.z],
+                "evidence": "RigCalc calculation scope setting (corner)",
             })
     for attached in point_loads:
         item, attachment = attached.item, attached.attachment
@@ -544,19 +562,55 @@ def solve_general_frame(construction, loads=None):
         contact = {"converged": False, "solution": None,
                    "issue": "tension_only_active_set_no_feasible_solution"}
     final = contact["solution"] if contact["solution"] is not None else signed
+    rotating = None
+    if (contact["converged"] and
+            not _stabilisers_ok(model, final, support_nodes, total_mass) and
+            final["active_ids"] == signed["active_ids"]):
+        # Every hoist is engaged but the supports cannot hold the drawn
+        # geometry (one hoist, or all hoists on one line): the rig rotates
+        # about its support line until its centre of gravity is below it.
+        # That rotation does not change the vertical reactions, which follow
+        # exactly from rigid-body statics along the support line.
+        rotating = _rigid_line_reactions(model, node_loads, support_nodes)
+        if rotating is not None:
+            final = dict(final, reactions_kg=rotating)
+            if any(value < -REACTION_TOLERANCE_KG
+                   for value in rotating.values()):
+                contact = {"converged": False, "solution": None,
+                           "issue":
+                           "tension_only_active_set_no_feasible_solution"}
+                rotating = None
+                final = signed
     result.update(_format(construction, model, final, signed, contact,
                           support_nodes, total_mass, member_by_id))
     if transferred:
         result["validation"]["load_model_valid"] = False
-    support_model_valid = (contact["converged"] and
-                           result["validation"]["stabiliser_forces_ok"] and
+    stable = result["validation"]["stabiliser_forces_ok"]
+    if rotating is not None:
+        stable = True
+        result["validation"]["rotation_about_support_line"] = True
+        result["validation"]["reaction_method"] = (
+            "rigid_body_statics_along_support_line")
+        # The reactions are exact statics, independent of the stabilised
+        # frame solve (whose residual is poor because only weak springs hold
+        # the rotation, and whose member results are discarded below).
+        result["validation"]["frame_numerically_valid"] = (
+            result["validation"]["numerically_valid"])
+        result["validation"]["numerically_valid"] = True
+        result["validation"]["moment_equilibrium_ok"] = True
+        # The rig does not hang in the drawn geometry, so member forces and
+        # deflections of the drawn model are not meaningful.
+        result["element_forces"] = []
+        result["deflection"] = {"maximum": None, "spans": []}
+        issues.append("rig_rotates_about_support_line")
+    support_model_valid = (contact["converged"] and stable and
                            not any(issue.startswith("coincident_supports")
                                    for issue in issues))
     result["status"] = ("preliminary" if contact["converged"]
                         else "diagnostic")
     if not contact["converged"]:
         issues.append(contact["issue"])
-    if not result["validation"]["stabiliser_forces_ok"]:
+    if not stable:
         result["status"] = "diagnostic"
         issues.append("lateral_or_roll_stability_not_provided_by_supports")
     finalize_eligibility(
@@ -565,6 +619,69 @@ def solve_general_frame(construction, loads=None):
         load_model_valid=result["validation"].get("load_model_valid", True),
         permit_writeback=True, permit_load_transfer=True)
     return result
+
+
+NON_BLOCKING_ISSUES = ("rig_rotates_about_support_line",)
+
+
+def _rigid_line_reactions(model, node_loads, support_nodes):
+    """Exact vertical reactions for a rig hanging from one or two points.
+
+    Returns None when the supports do not define a usable line (three or
+    more points, or two points vertically above each other).
+    """
+    if len(support_nodes) == 1:
+        attached, _ = support_nodes[0]
+        total = sum(node_loads.values()) + sum(
+            element.q_n_m*_element_length_mm(element)/1000.0/GRAVITY_M_S2
+            for element in model.elements)
+        return {attached.item.id: total}
+    if len(support_nodes) != 2:
+        return None
+    (first, node_a), (second, node_b) = support_nodes
+    dx, dy = node_b.x-node_a.x, node_b.y-node_a.y
+    span = (dx*dx+dy*dy)**0.5
+    if span <= 1.0:
+        return None
+    ux, uy = dx/span, dy/span
+    masses = []
+    by_index = {node.index: node for node in model.nodes}
+    for index, mass in node_loads.items():
+        node = by_index[index]
+        masses.append((mass, node.x, node.y))
+    for element in model.elements:
+        if element.q_n_m <= 0.0:
+            continue
+        i, j = element.node_i, element.node_j
+        mass = element.q_n_m*_element_length_mm(element)/1000.0/GRAVITY_M_S2
+        masses.append((mass, (i.x+j.x)/2.0, (i.y+j.y)/2.0))
+    total = sum(mass for mass, _, _ in masses)
+    moment = sum(mass*((x-node_a.x)*ux+(y-node_a.y)*uy)
+                 for mass, x, y in masses)
+    second_reaction = moment/span
+    return {first.item.id: total-second_reaction,
+            second.item.id: second_reaction}
+
+
+def _is_box_corner(corner):
+    text = "{} {}".format(corner.symbol, corner.name).lower()
+    return "box" in text or "multi" in text
+
+
+def _corner_cable_length_mm(corner, arms):
+    """Cable run through a corner block.
+
+    L and T corners: the arms from the corner node to each connected member
+    end (C21 0.71 m, C35 0.855 m).  A multi-way box is counted on all six
+    faces, connected or not, at half the section size (0.866 m), matching
+    Production Assist's cable-length convention.
+    """
+    if _is_box_corner(corner):
+        half = max(corner.width_mm, corner.height_mm)/2.0
+        if half <= 0.0 and arms:
+            half = sum(arms)/len(arms)
+        return 6.0*half
+    return sum(arms)
 
 
 NON_FATAL_ISSUES = ("transferred_load_location_unsupported_in_general_frame",)

@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from .contact import apply_slack_chain_rule
+
 
 def compare_calculations(linear, nonlinear):
     nonlinear_by_id = {
@@ -77,7 +79,7 @@ def select_primary_calculation(linear, nonlinear):
         if use_nonlinear:
             item["status"] = "preliminary"
             item["writeback_eligible"] = True
-        selected.append(item)
+        selected.append(apply_slack_chain_rule(item))
     return {
         "status": "PRELIMINARY_PRIMARY_CALCULATION",
         "limitations": list(linear.get("limitations", [])),

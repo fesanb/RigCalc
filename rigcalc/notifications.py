@@ -249,8 +249,51 @@ def evaluate_zero_hoist_outcomes(outcomes):
     return notifications
 
 
+def evaluate_hoist_states(calculation):
+    """Warn at slack chains and at rigs that rotate about their supports."""
+    notifications = []
+    for construction in calculation.get("constructions", []):
+        if construction.get("status") != "preliminary":
+            continue
+        construction_id = str(construction.get("construction_id", ""))
+        rotating = ("rig_rotates_about_support_line" in
+                    construction.get("issues", []))
+        hoists = [item for item in construction.get("reactions", [])
+                  if not item.get("is_structural_link")]
+        for reaction in hoists:
+            support_id = str(reaction.get("support_id", ""))
+            hoist_id = str(reaction.get("support_hoist_id") or support_id)
+            if reaction.get("support_active") is False:
+                notifications.append({
+                    "id": "slack_chain:{}:{}".format(construction_id,
+                                                     support_id),
+                    "type": "slack_chain", "severity": "warning",
+                    "class_name": LOAD_NOTIFICATION_CLASS,
+                    "construction_id": construction_id,
+                    "support_id": support_id,
+                    "message": "SLACK CHAIN\n{}\nHigh Hook 0.00 kN".format(
+                        hoist_id),
+                })
+            if rotating:
+                others = ", ".join(
+                    str(item.get("support_hoist_id") or item["support_id"])
+                    for item in hoists if item is not reaction)
+                notifications.append({
+                    "id": "rotation:{}:{}".format(construction_id, support_id),
+                    "type": "rig_rotation", "severity": "warning",
+                    "class_name": LOAD_NOTIFICATION_CLASS,
+                    "construction_id": construction_id,
+                    "support_id": support_id,
+                    "message": ("ROTATES\n{}{}\nRig will not hang as drawn"
+                                .format(hoist_id,
+                                        " - " + others if others else "")),
+                })
+    return notifications
+
+
 def evaluate_notifications(calculation):
     return (evaluate_hoist_overloads(calculation) +
             evaluate_deflections(calculation) +
             evaluate_internal_forces(calculation) +
-            evaluate_support_model_failures(calculation))
+            evaluate_support_model_failures(calculation) +
+            evaluate_hoist_states(calculation))

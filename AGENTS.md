@@ -30,6 +30,15 @@ fail closed and report the uncertainty instead of guessing.
   whatever the hoist orientation (`Hoist Up` or `Hoist Down`). It is never a
   truss load: High Hook = truss reaction + `WeightWithChain`, and the truss
   reaction alone decides whether a chain is taut or slack.
+- A slack chain is reported and written back as High Hook `0.00` with a
+  slack-chain warning in the drawing and report.
+- Cable load (kg/m) applies to corner blocks too: L/T corners over their arms
+  from the corner node to each connected member, multi-way boxes on all six
+  faces at half the section size (Production Assist convention).
+- A rig whose hoists cannot hold the drawn geometry (one hoist, or two
+  hoists) rotates about its support line; its High Hook values follow from
+  rigid-body statics and are written back with a rotation warning. Member
+  forces and deflections of the drawn geometry are not reported for it.
 - Every discovered hoist receives an explicit outcome. If no load can be
   calculated, emit `0.00 kN` and a precise drawing/report reason (for example
   no viable carrier, too far from geometry, ambiguity, or insufficient

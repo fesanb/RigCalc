@@ -20,14 +20,10 @@ def _write_candidates(document, calculation):
             support = supports.get(reaction["support_id"])
             if support is None or support.source_ref is None:
                 continue
-            if reaction.get("support_active") is False:
-                skipped.append({
-                    "support_id": support.id, "hoist_id": support.hoist_id,
-                    "construction_id": construction["construction_id"],
-                    "status": "skipped_slack_or_released_support",
-                })
-                continue
             mass_kg = reaction.get("preliminary_high_hook_mass_kg")
+            if reaction.get("support_active") is False:
+                # A slack chain is written as 0.00 and marked in the drawing.
+                mass_kg = 0.0
             if (not isinstance(mass_kg, (int, float)) or
                     not isfinite(mass_kg) or mass_kg < 0.0):
                 skipped.append({
