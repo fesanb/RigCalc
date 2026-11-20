@@ -40,5 +40,8 @@ class Bridle:
     legs: List[BridleLeg] = field(default_factory=list)
     # The down leg is the hoist hanging from the apex (N in Vectorworks).
     down_leg_max_force_n: Optional[float] = None
+    # Read-only evidence: every record and nested object of the bridle, to
+    # locate the leg parts (lengths from parts, issue #1).
+    vw_inventory: dict = field(default_factory=dict)
     object_uuid: str = ""
     source_ref: Any = field(default=None, repr=False, compare=False)

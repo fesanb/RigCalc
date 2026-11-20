@@ -294,7 +294,23 @@ def _parse_bridle(vs, handle, object_id, fields, safety_factor=1.0):
         weight_kg=weight_raw*safety_factor, weight_raw_kg=weight_raw,
         legs=legs,
         down_leg_max_force_n=safe_float(fields.get("ForceDownLegMax")),
+        vw_inventory=_bridle_inventory(vs, handle),
         object_uuid=_object_uuid(vs, handle), source_ref=handle)
+
+
+def _bridle_inventory(vs, handle):
+    """All records and nested objects of a bridle (read only, bounded)."""
+    from .inventory import _child_inventory
+    from .records import get_all_record_info
+    try:
+        records = get_all_record_info(vs, handle)
+    except Exception as error:  # noqa: BLE001 - evidence only
+        records = {"error": str(error)}
+    try:
+        children = _child_inventory(vs, handle, max_items=200)
+    except Exception as error:  # noqa: BLE001 - evidence only
+        children = [{"error": str(error)}]
+    return {"records": records, "children": children}
 
 
 def _parse_house_rigging_point(vs, handle, object_id, fields):
