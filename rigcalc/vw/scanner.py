@@ -1,6 +1,7 @@
 import math
 
-from rigcalc.model import (DistributedLoad, DocumentModel, Point3D, PointLoad,
+from rigcalc.model import (Bridle, BridleLeg, HouseRiggingPoint,
+                           DistributedLoad, DocumentModel, Point3D, PointLoad,
                            StructuralLink, Support, TrussSegment)
 from rigcalc.normalization import load_components
 
@@ -253,6 +254,67 @@ def _parse_dead_hang(vs, handle, object_id, fields, safety_factor=1.0):
     )
 
 
+BRIDLE_LEG_COUNTS = {"twoway": 2, "threeway": 3, "fourway": 4}
+
+
+def _parse_bridle(vs, handle, object_id, fields, safety_factor=1.0):
+    """Read a multi-leg bridle (apex, legs and Vectorworks leg results).
+
+    Lengths and trims are mm, ``TotalWeight`` is grams and ``ForceLeg*`` /
+    ``ForceMaxLeg*`` are N (leg force x sin(angle) equals the vertical force
+    on the connected HouseRiggingPoint in the test drawing).
+    """
+    bridle_type = str(fields.get("BridleType", ""))
+    count = BRIDLE_LEG_COUNTS.get(bridle_type.replace(" ", "").lower())
+    if count is None:
+        return None
+    location = symbol_location(vs, handle)
+    x = safe_float(fields.get("RelativeDimX"), location.x if location else None)
+    y = safe_float(fields.get("RelativeDimY"), location.y if location else None)
+    apex_z = safe_float(fields.get("ApexHeight"))
+    if x is None or y is None or apex_z is None:
+        return None
+    legs = []
+    for number in range(1, count+1):
+        length = safe_float(fields.get("LengthLeg{}".format(number)))
+        trim = safe_float(fields.get("TrimmLeg{}".format(number)))
+        if not length or trim is None:
+            return None
+        legs.append(BridleLeg(
+            number=number, length_mm=length, trim_mm=trim,
+            angle_deg=safe_float(fields.get("AngleLeg{}".format(number))),
+            vw_force_n=safe_float(fields.get("ForceLeg{}".format(number))),
+            max_force_n=safe_float(fields.get("ForceMaxLeg{}".format(number)))))
+    weight_raw = safe_float(fields.get("TotalWeight"), 0.0)/1000.0
+    return Bridle(
+        id=object_id, name=fields.get("Name", ""),
+        index=fields.get("Index", ""), bridle_type=bridle_type,
+        apex=Point3D(x, y, apex_z),
+        connected_hoist_uuid=str(fields.get("ConnectedHoistUUID", "")),
+        weight_kg=weight_raw*safety_factor, weight_raw_kg=weight_raw,
+        legs=legs, object_uuid=_object_uuid(vs, handle), source_ref=handle)
+
+
+def _parse_house_rigging_point(vs, handle, object_id, fields):
+    location = symbol_location(vs, handle)
+    center = center_point(vs, handle)
+    if location is None and center is None:
+        return None
+    x = safe_float(fields.get("OriginX"), location.x if location else center[0])
+    y = safe_float(fields.get("OriginY"), location.y if location else center[1])
+    z = center[2] if center is not None else 0.0
+
+    def triple(prefix):
+        values = [safe_float(fields.get(prefix+axis)) for axis in "XYZ"]
+        return None if any(value is None for value in values) else tuple(values)
+
+    return HouseRiggingPoint(
+        id=object_id, position=Point3D(x, y, z),
+        object_uuid=_object_uuid(vs, handle),
+        vw_force_n=triple("Force"), max_force_n=triple("MaxForce"),
+        source_ref=handle)
+
+
 def _parse_load(vs, handle, object_id, record_name, fields):
     location = symbol_location(vs, handle)
     if location is None:
@@ -418,8 +480,20 @@ def scan_document(vs_module=None, included_layers=None, progress=None,
             item = _parse_dead_hang(
                 vs_module, handle, "D{:03d}".format(counter), fields,
                 safety_factor=safety_factor)
+            bridle = None if item else _parse_bridle(
+                vs_module, handle, "B{:03d}".format(counter), fields,
+                safety_factor=safety_factor)
             if item:
                 document.supports.append(item)
+            elif bridle:
+                document.bridles.append(bridle)
+            else:
+                _record_ignored(vs_module, document, handle, record_name, fields)
+        elif record_name == "HouseRiggingPoint":
+            point = _parse_house_rigging_point(
+                vs_module, handle, "R{:03d}".format(counter), fields)
+            if point:
+                document.house_rigging_points.append(point)
             else:
                 _record_ignored(vs_module, document, handle, record_name, fields)
         elif record_name == "BrxCustomTrussCross":

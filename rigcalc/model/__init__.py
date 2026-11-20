@@ -1,3 +1,4 @@
+from .bridle import Bridle, BridleLeg, HouseRiggingPoint
 from .construction import (AttachedObject, Attachment, Construction,
                            DocumentModel, StationRange)
 from .geometry import BoundingBox, Point3D
@@ -7,7 +8,8 @@ from .section import MechanicalSection
 from .truss import TrussSegment
 
 __all__ = [
-    "AttachedObject", "Attachment", "BoundingBox", "Construction",
+    "AttachedObject", "Attachment", "BoundingBox", "Bridle", "BridleLeg",
+    "Construction", "HouseRiggingPoint",
     "DocumentModel", "Point3D",
     "DistributedLoad", "MechanicalSection", "PointLoad", "StructuralLink",
     "StationRange", "Support", "TrussSegment",

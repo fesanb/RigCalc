@@ -263,6 +263,19 @@ not approved Vectorworks writeback values.
 Writeback happens automatically during a normal run. Work in a copy or a
 version-controlled Vectorworks document when validating new datasets.
 
+## Bridles
+
+Multi-leg bridles (`BridleObj`, two or three legs) are calculated from the
+High Hook of the hoist hanging from the apex (`ConnectedHoistUUID`) plus the
+bridle's own weight (`TotalWeight`, grams). Each leg is matched to the
+`HouseRiggingPoint` whose plan position at the leg trim lies at the leg
+length from the apex; leg tensions follow from equilibrium of the apex.
+Results, with the Vectorworks leg forces for comparison, are written to
+`rigcalc_bridles.json` and `rigcalc_bridles.txt`; leg overloads against
+`ForceMaxLeg` and bridles that cannot be calculated get a marker. Four-leg
+bridles are statically indeterminate and are reported, not calculated.
+Nothing is written to bridle objects yet.
+
 ## In-document notifications
 
 After selecting the primary calculation, RigCalc checks the reaction at each

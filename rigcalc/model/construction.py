@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from .bridle import Bridle, HouseRiggingPoint
 from .hoist import Support
 from .load import DistributedLoad, PointLoad, StructuralLink
 from .truss import TrussSegment
@@ -84,6 +85,8 @@ class DocumentModel:
     structural_links: List[StructuralLink] = field(default_factory=list)
     suppressed_point_loads: List[PointLoad] = field(default_factory=list)
     ignored_record_types: List[str] = field(default_factory=list)
+    bridles: List[Bridle] = field(default_factory=list)
+    house_rigging_points: List[HouseRiggingPoint] = field(default_factory=list)
     # Read-only evidence for ignored plug-in objects (record, position and
     # fields) so unrecognised structural objects can be identified.
     ignored_objects: List[dict] = field(default_factory=list)

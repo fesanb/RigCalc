@@ -3,7 +3,7 @@ import os
 
 from rigcalc import config
 from rigcalc.normalization import normalize_inventory
-from rigcalc.notifications import (evaluate_notifications,
+from rigcalc.notifications import (evaluate_bridles, evaluate_notifications,
                                    evaluate_zero_hoist_outcomes)
 from rigcalc.report import (build_run_summary, make_calculation_text,
                             make_hoist_outcomes_text, make_text_report,
@@ -13,6 +13,8 @@ from rigcalc.palette import build_history, build_palette_run
 from rigcalc.solver import (calculate_corotational_reactions,
                             calculate_reactions, compare_calculations,
                             make_comparison_text, select_primary_calculation)
+from rigcalc.solver.bridle import calculate_bridles, make_bridle_text
+
 from .hoist_writeback import write_high_hook_values
 from .notifications import write_notification_markers
 from .palette_session import set_active_palette_run
@@ -193,8 +195,17 @@ def write_reports(vs, document, constructions, inventory=None,
     with open(os.path.join(output_dir, "rigcalc_hoist_outcomes.txt"),
               "w", encoding="utf-8") as stream:
         stream.write(make_hoist_outcomes_text(hoist_outcomes))
+    bridles = calculate_bridles(document, hoist_outcomes,
+                                safety_factor=safety_factor)
+    with open(os.path.join(output_dir, "rigcalc_bridles.json"),
+              "w", encoding="utf-8") as stream:
+        json.dump({"bridles": bridles}, stream, ensure_ascii=False, indent=2)
+    with open(os.path.join(output_dir, "rigcalc_bridles.txt"),
+              "w", encoding="utf-8") as stream:
+        stream.write(make_bridle_text(bridles))
     notifications = (evaluate_notifications(primary) +
-                     evaluate_zero_hoist_outcomes(hoist_outcomes))
+                     evaluate_zero_hoist_outcomes(hoist_outcomes) +
+                     evaluate_bridles(bridles))
     palette_run = build_palette_run(
         document, primary, hoist_outcomes, notifications,
         calculation_settings=settings,

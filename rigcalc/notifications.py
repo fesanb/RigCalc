@@ -291,6 +291,37 @@ def evaluate_hoist_states(calculation):
     return notifications
 
 
+def evaluate_bridles(bridles):
+    """Mark bridle leg overloads and bridles that could not be calculated."""
+    notifications = []
+    for item in bridles:
+        label = item.get("index") or item["bridle_id"]
+        position = item.get("apex_mm")
+        if item["status"] != "calculated":
+            notifications.append({
+                "id": "bridle:{}".format(item["bridle_id"]),
+                "type": "bridle_not_calculated", "severity": "error",
+                "class_name": LOAD_NOTIFICATION_CLASS,
+                "construction_id": "", "source_position_mm": position,
+                "message": "BRIDLE {}\nnot calculated\n{}".format(
+                    label, (item["issues"] or ["-"])[0]),
+            })
+            continue
+        for leg in item["legs"]:
+            if not leg.get("overload"):
+                continue
+            notifications.append({
+                "id": "bridle:{}:{}".format(item["bridle_id"], leg["leg"]),
+                "type": "bridle_leg_overload", "severity": "error",
+                "class_name": LOAD_NOTIFICATION_CLASS,
+                "construction_id": "", "source_position_mm": position,
+                "message": "OVERLOAD\nBridle {} leg {}\n{:.2f}/{:.2f} kN".format(
+                    label, leg["leg"], leg["force_n"]/1000.0,
+                    leg["max_force_n"]/1000.0),
+            })
+    return notifications
+
+
 def evaluate_notifications(calculation):
     return (evaluate_hoist_overloads(calculation) +
             evaluate_deflections(calculation) +

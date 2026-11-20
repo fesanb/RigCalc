@@ -8,10 +8,16 @@ from .validation import guarded_solve, load_transfer_eligible
 
 
 def _is_level_straight_chain(construction):
+    stations = {round(item.attachment.global_station_mm, 6)
+                for item in construction.supports
+                if item.attachment.global_station_mm is not None}
+    # A single support (balanced or rotating rig) is handled by the general
+    # frame; the beam solvers need at least two distinct supports.
     return (construction.stationing == "open_chain" and
             bool(construction.truss_segments) and
             all(item.is_line for item in construction.truss_segments) and
-            not planar_beam_geometry_issue(construction))
+            not planar_beam_geometry_issue(construction) and
+            len(stations) >= 2)
 
 
 def _solve_local(construction, loads):
