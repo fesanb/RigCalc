@@ -36,7 +36,7 @@ def _connection_for(connections, a_id, b_id):
 
 
 def _physical_endpoint(truss, port):
-    if not truss.is_line:
+    if not truss.has_axis:
         return truss.position
     return truss.start if port == "start" else truss.end
 
@@ -55,7 +55,7 @@ def order_component(component, adjacency, lookup, connections):
                 _, connected_port = _connection_for(connections, node, neighbour)
                 free_port = "end" if connected_port == "start" else "start"
                 point = _physical_endpoint(truss, free_port)
-            elif truss.is_line:
+            elif truss.has_axis:
                 point = min((truss.start, truss.end), key=lambda value: (value.x, value.y))
             else:
                 point = truss.position

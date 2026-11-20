@@ -4,7 +4,8 @@ from rigcalc.model import (DistributedLoad, DocumentModel, Point3D, PointLoad,
                            StructuralLink, Support, TrussSegment)
 from rigcalc.normalization import load_components
 
-from .geometry import bounding_box, center_z, symbol_location, z_rotation
+from .geometry import (bounding_box, center_point, center_z, symbol_location,
+                       z_rotation)
 from .records import get_parametric_info, safe_float
 
 
@@ -46,13 +47,23 @@ def _parse_truss(vs, handle, object_id, fields, cable_load_kg_m=0.0,
             pass
         elevation_angle = math.radians(elevation)
         plan_angle = math.radians(rotation)
-        horizontal = math.cos(elevation_angle) * length
-        start = position
-        end = Point3D(
-            position.x + math.cos(plan_angle) * horizontal,
-            position.y + math.sin(plan_angle) * horizontal,
-            position.z - math.sin(elevation_angle) * length,
-        )
+        direction = (math.cos(elevation_angle) * math.cos(plan_angle),
+                     math.cos(elevation_angle) * math.sin(plan_angle),
+                     -math.sin(elevation_angle))
+        center = center_point(vs, handle)
+        if center is not None:
+            # The insertion point sits at the bottom of the start face, so it
+            # is off the centreline for any non-level member and its Z is not
+            # the start height.  Build the axis around the 3D centre instead.
+            start = Point3D(*(c - d * length / 2.0
+                              for c, d in zip(center, direction)))
+            end = Point3D(*(c + d * length / 2.0
+                            for c, d in zip(center, direction)))
+        else:
+            start = position
+            end = Point3D(*(c + d * length for c, d in
+                            zip((position.x, position.y, position.z),
+                                direction)))
     return TrussSegment(
         id=object_id, name=fields.get("Name", ""), item_type=fields.get("ItemType", ""),
         position=position, nominal_length_mm=length, start=start, end=end,
@@ -147,6 +158,16 @@ def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
         if "pickup" in name.lower() and name not in geometry_fields:
             geometry_fields[name] = value
     geometry_fields["RigCalcLowerConnectionSource"] = lower_source
+    capacity_kg = safe_float(fields.get("Capacity"), 0.0) / 1000.0
+    symbol = (fields.get("SymbolUsed", "") or "").replace(" ", "").lower()
+    if "deadhang" in symbol:
+        # A hoist object drawn with the DeadHang symbol is a fixed drop.
+        # Spotlight gives it a placeholder capacity of 0.001 t (1 kg), which
+        # is not a rating; leave the capacity unknown instead of reporting
+        # a false overload.
+        capacity_kg = 0.0
+        geometry_fields["RigCalcCapacityNote"] = (
+            "DeadHang symbol: placeholder capacity ignored")
     return Support(
         id=object_id, name=fields.get("HoistName", ""),
         hoist_id=fields.get("HoistID", ""), position=position,
@@ -163,7 +184,7 @@ def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
                         safety_factor),
         manual_load_raw_kg=(safe_float(
             fields.get("RoofForceNoDeadloadWeight"), 0.0) / 1000.0),
-        capacity_kg=safe_float(fields.get("Capacity"), 0.0) / 1000.0,
+        capacity_kg=capacity_kg,
         object_position=Point3D(location.x, location.y, center_z(vs, handle)),
         geometry_fields=geometry_fields,
         source_ref=handle,

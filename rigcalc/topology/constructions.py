@@ -1,5 +1,6 @@
 from rigcalc.model.construction import Construction
 
+from .arcs import resolve_document_arcs
 from .attachments import attach_document_objects
 from .connections import detect_connections
 from .stationing import build_adjacency, build_station_map, connected_components, order_component
@@ -15,6 +16,7 @@ def _connection_warning(connection):
 
 
 def build_constructions(document):
+    resolve_document_arcs(document.trusses)
     connections = detect_connections(document.trusses)
     adjacency = build_adjacency(document.trusses, connections)
     lookup = {truss.id: truss for truss in document.trusses}

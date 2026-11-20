@@ -41,6 +41,14 @@ class ScannerDeduplicationTests(unittest.TestCase):
             support.geometry_fields["RigCalcLowerConnectionSource"],
             "TrussBottomTrim")
 
+    def test_deadhang_symbol_placeholder_capacity_is_ignored(self):
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
+            "TrussBottomTrim": "0", "SymbolUsed": "DeadHang",
+            "Capacity": "1",
+        })
+        self.assertEqual(support.capacity_kg, 0.0)
+
     def test_zero_load_trim_is_used_for_inverted_hoist(self):
         support = _parse_support(FakeVS(), "handle", "H1", {
             "HoistPos": "Hoist Up", "OriginX": "100", "OriginY": "200",

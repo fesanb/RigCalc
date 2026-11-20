@@ -3,6 +3,11 @@ COLLINEAR_LONGITUDINAL_TOLERANCE_MM = 300.0
 COLLINEAR_LATERAL_TOLERANCE_MM = 50.0
 COLLINEAR_ANGLE_TOLERANCE_DEG = 5.0
 CORNER_TOLERANCE_MM = 100.0
+# A truss end belongs to a corner block when it lies within this multiple of
+# the truss section size from the corner insertion point in 3D (the block is
+# about two section widths across).  Each end joins at most its nearest
+# corner.  The 2D bounding box is not used: it depends on the active view.
+CORNER_ENDPOINT_REACH_FACTOR = 2.0
 ATTACHMENT_WARNING_DISTANCE_MM = 500.0
 # Maximum 3D distance from a semantic hanging point to a carrier axis. An
 # object outside this sphere remains unresolved; it is never attached merely

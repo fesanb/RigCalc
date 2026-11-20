@@ -11,18 +11,37 @@ from .geometry import point_to_segment, point_to_segment_2d
 ASSOCIATION_AMBIGUITY_TOLERANCE_MM = 1.0e-6
 
 
+def _nearest_on_axis(position, truss, plan_only):
+    """Closest centreline point; local_t is the fraction of axis length."""
+    points = truss.axis_points(1.0)
+    best, travelled = None, 0.0
+    for start, end in zip(points, points[1:]):
+        segment = ((end.x-start.x)**2+(end.y-start.y)**2+
+                   (end.z-start.z)**2)**0.5
+        if plan_only:
+            distance, t, qx, qy = point_to_segment_2d(position, start, end)
+            qz = start.z + t*(end.z-start.z)
+        else:
+            distance, t, qx, qy, qz = point_to_segment(position, start, end)
+        candidate = (distance, travelled+t*segment, qx, qy, qz)
+        if best is None or candidate[0] < best[0]:
+            best = candidate
+        travelled += segment
+    if best is None or travelled <= 0.0:
+        return None
+    distance, along, qx, qy, qz = best
+    return distance, along/travelled, qx, qy, qz
+
+
 def nearest_line_truss(position, trusses, plan_only=False):
     best = None
     for truss in trusses:
-        if not truss.is_line:
+        if not truss.has_axis:
             continue
-        if plan_only:
-            axis_distance, local_t, qx, qy = point_to_segment_2d(
-                position, truss.start, truss.end)
-            qz = truss.start.z + local_t * (truss.end.z - truss.start.z)
-        else:
-            axis_distance, local_t, qx, qy, qz = point_to_segment(
-                position, truss.start, truss.end)
+        nearest = _nearest_on_axis(position, truss, plan_only)
+        if nearest is None:
+            continue
+        axis_distance, local_t, qx, qy, qz = nearest
         envelope_radius = max(truss.width_mm, truss.height_mm) / 2.0
         clearance = max(0.0, axis_distance - envelope_radius)
         candidate = (
@@ -40,7 +59,7 @@ def attach_item(item, construction, plan_only=False, method="geometry_sphere"):
     clearance, axis_distance, _, truss, local_t, qx, qy, qz = nearest
     if clearance > config.ATTACHMENT_SEARCH_RADIUS_MM:
         return None
-    local = local_t * truss.geometric_length_mm
+    local = local_t * truss.axis_length_mm
     station = None
     station_range = construction.station_map.get(truss.id)
     if station_range:
@@ -233,6 +252,10 @@ def _set_hoist_transfer_targets(document, constructions):
             support.transfer_target_construction_id = target.id
             support.transfer_target_station_mm = (
                 target_attachment.attachment.global_station_mm)
+            support.transfer_target_truss_id = (
+                target_attachment.attachment.truss_id)
+            support.transfer_target_local_mm = (
+                target_attachment.attachment.local_position_from_truss_start_mm)
 
 
 def _attach_structural_links(document, constructions):

@@ -16,6 +16,21 @@ def center_z(vs, handle):
         return 0.0
 
 
+def center_point(vs, handle):
+    """3D centre of the object's geometry as (x, y, z), or None.
+
+    ``Get3DCntr`` returns ``((x, y), z)``.  For a truss of symmetric section
+    this is the midpoint of its centreline in world coordinates, unlike the
+    symbol insertion point, which lies at the bottom of the start face.
+    """
+    try:
+        plan, z = vs.Get3DCntr(handle)
+        x, y = float(plan[0]), float(plan[1])
+        return x, y, float(z)
+    except Exception:
+        return None
+
+
 def z_rotation(vs, handle):
     try:
         orientation = vs.Get3DOrientation(handle)
