@@ -10,9 +10,15 @@ def document_path(vs):
     """Return the saved Vectorworks document path, never a guessed path."""
     try:
         path = vs.GetFPathName() if hasattr(vs, "GetFPathName") else ""
-        return os.path.abspath(str(path)) if path else None
     except Exception:
         return None
+    path = str(path or "")
+    # A bare file name (no folder) is not a saved location: resolving it
+    # against the working directory put the project store under
+    # C:\Program Files and failed with "Access denied".
+    if not path or not os.path.isabs(path):
+        return None
+    return os.path.normpath(path)
 
 
 def project_root(vs):

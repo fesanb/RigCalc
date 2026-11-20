@@ -27,10 +27,11 @@ def _format(value):
     return "{:.6f}".format(value)
 
 
-def _write_and_verify(vs, handle, record, values):
+def _write_and_verify(vs, handle, record, values, reset=True):
     for field, value in values.items():
         vs.SetRField(handle, record, field, _format(value))
-    vs.ResetObject(handle)
+    if reset:
+        vs.ResetObject(handle)
     _, readback = get_parametric_info(vs, handle)
     mismatches = {}
     for field, value in values.items():
@@ -82,9 +83,14 @@ def write_bridle_forces(vs, document, bridle_results):
             results.append({"bridle_id": item["bridle_id"],
                             "status": "skipped_not_bridle"})
             continue
+        # Diagnostic: Vectorworks cleared the bridle force fields after a
+        # previous write (likely when the bridle regenerates).  Write without
+        # forcing a regeneration and keep every field before and after.
         readback, mismatches = _write_and_verify(
-            vs, bridle.source_ref, BRIDLE_RECORD, values)
+            vs, bridle.source_ref, BRIDLE_RECORD, values, reset=False)
         results.append({
+            "all_fields_before": dict(old),
+            "all_fields_after": dict(readback),
             "bridle_id": item["bridle_id"], "index": item.get("index"),
             "status": "written" if not mismatches else "readback_mismatch",
             "values_n": values,

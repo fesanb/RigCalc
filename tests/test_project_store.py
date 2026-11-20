@@ -36,6 +36,13 @@ class ProjectStoreTests(unittest.TestCase):
         self.assertIsNone(ensure_project(vs))
         self.assertIsNone(archive_latest(vs))
 
+    def test_bare_file_name_is_treated_as_unsaved(self):
+        # Vectorworks can report only a file name; resolving it against the
+        # working directory targeted C:\Program Files (Access denied).
+        vs = FakeVS("Show v2027_user.vwx")
+        self.assertIsNone(project_root(vs))
+        self.assertIsNone(ensure_project(vs))
+
     def test_latest_is_copied_to_immutable_run(self):
         with tempfile.TemporaryDirectory() as root:
             vs = FakeVS(os.path.join(root, "Show.vwx"))
