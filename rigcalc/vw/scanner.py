@@ -24,6 +24,20 @@ def _object_uuid(vs, handle):
         return ""
 
 
+def _record_ignored(vs, document, handle, record_name, fields):
+    """Keep the ignored record name plus read-only identifying evidence."""
+    document.ignored_record_types.append(record_name)
+    location = symbol_location(vs, handle)
+    center = center_point(vs, handle)
+    document.ignored_objects.append({
+        "record": record_name,
+        "insertion": None if location is None else [location.x, location.y],
+        "center": None if center is None else list(center),
+        "fields": {str(key): str(value) for key, value in
+                   (fields or {}).items()},
+    })
+
+
 def _parse_truss(vs, handle, object_id, fields, cable_load_kg_m=0.0,
                  safety_factor=1.0):
     location = symbol_location(vs, handle)
@@ -407,7 +421,7 @@ def scan_document(vs_module=None, included_layers=None, progress=None,
             if item:
                 document.supports.append(item)
             else:
-                document.ignored_record_types.append(record_name)
+                _record_ignored(vs_module, document, handle, record_name, fields)
         elif record_name == "BrxCustomTrussCross":
             location = symbol_location(vs_module, handle)
             if location:
@@ -426,7 +440,7 @@ def scan_document(vs_module=None, included_layers=None, progress=None,
                 document.point_loads.extend(points)
                 document.distributed_loads.extend(distributed)
             else:
-                document.ignored_record_types.append(record_name)
+                _record_ignored(vs_module, document, handle, record_name, fields)
         if progress:
             progress("update", counter, "Scanning model {}/{}".format(
                 counter, len(handles)))

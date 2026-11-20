@@ -84,3 +84,6 @@ class DocumentModel:
     structural_links: List[StructuralLink] = field(default_factory=list)
     suppressed_point_loads: List[PointLoad] = field(default_factory=list)
     ignored_record_types: List[str] = field(default_factory=list)
+    # Read-only evidence for ignored plug-in objects (record, position and
+    # fields) so unrecognised structural objects can be identified.
+    ignored_objects: List[dict] = field(default_factory=list)
