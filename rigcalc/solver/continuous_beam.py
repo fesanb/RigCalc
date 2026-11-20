@@ -390,9 +390,9 @@ def solve_continuous_beam(construction, loads, _active_support_ids=None,
         # writeback model.  Geometry or contact
         # failures above remain fail-closed through support_model_valid.
         permit_writeback=True,
-        # A High Hook field write must not silently authorize a new upstream
-        # structural load path.  Transfer has its own model-validation gate.
-        permit_load_transfer=not has_hoist_support)
+        # A validated High Hook (reaction + WeightWithChain) is exactly the
+        # load the carrier above receives.
+        permit_load_transfer=True)
     released_count = sum(
         not item["support_active"] for item in result["reactions"])
     if released_count:

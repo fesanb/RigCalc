@@ -180,10 +180,11 @@ def solve_two_support_beam(construction, loads):
             if not support_model_valid:
                 result["issues"].append(
                     "tension_only_active_set_no_feasible_solution")
+            # A validated High Hook (reaction + WeightWithChain) is exactly
+            # the load the carrier above receives.
             finalize_eligibility(
                 result, support_model_valid=support_model_valid,
-                permit_writeback=True,
-                permit_load_transfer=not hoists)
+                permit_writeback=True, permit_load_transfer=True)
     return result
 
 
@@ -234,5 +235,9 @@ def _reaction_record(support, reaction_mass_kg):
         "capacity_kg": item.capacity_kg,
         "transfer_target_construction_id": item.transfer_target_construction_id,
         "transfer_target_station_mm": item.transfer_target_station_mm,
+        "transfer_target_truss_id": getattr(
+            item, "transfer_target_truss_id", ""),
+        "transfer_target_local_mm": getattr(
+            item, "transfer_target_local_mm", None),
         "is_structural_link": item.is_structural_link,
     }

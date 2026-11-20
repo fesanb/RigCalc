@@ -24,6 +24,10 @@ class Support:
     capacity_kg: float = 0.0
     transfer_target_construction_id: str = ""
     transfer_target_station_mm: Optional[float] = None
+    # Carrier member and distance along it on the target construction; this
+    # locates the transferred load when the target has no chain station.
+    transfer_target_truss_id: str = ""
+    transfer_target_local_mm: Optional[float] = None
     is_structural_link: bool = False
     # Preserve the evidence used to derive the physical rigging connection.
     # These values are diagnostic for now; the solver still uses ``position``.

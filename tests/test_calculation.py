@@ -37,7 +37,8 @@ class CalculationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["equilibrium_valid"])
         self.assertTrue(result["validation"]["support_model_valid"])
         self.assertTrue(result["writeback_eligible"])
-        self.assertFalse(result["load_transfer_eligible"])
+        # A validated High Hook is the load the carrier above receives.
+        self.assertTrue(result["load_transfer_eligible"])
         self.assertEqual(
             result["validation"]["contact_model"],
             "two_support_tension_only_chain_weight_to_top_hook")

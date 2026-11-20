@@ -122,6 +122,14 @@ def _notification_position(document, constructions, notification):
     construction = next((item for item in constructions
                          if item.id == notification.get("construction_id")),
                         None)
+    position = notification.get("source_position_mm")
+    if position is not None:
+        # General-frame results carry a world position (no chain station).
+        # Place the marker in the layer of the construction's members.
+        source_ref = next((item.source_ref for item in
+                           (construction.truss_segments if construction else [])
+                           if item.source_ref is not None), None)
+        return (position[0], position[1]), source_ref
     station = notification.get("source_station_mm")
     if construction is not None and station is not None:
         return _construction_position(construction, station)

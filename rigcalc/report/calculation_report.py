@@ -127,10 +127,18 @@ def make_calculation_text(data):
         if elements:
             lines.extend(["", "  ELEMENT END FORCES (local axes)"])
             for element in elements:
-                lines.append("    {}  {:.3f} -> {:.3f} m".format(
-                    element["element_id"],
-                    element["start_station_mm"] / 1000.0,
-                    element["end_station_mm"] / 1000.0))
+                prefix = ("{} ".format(element["truss_id"])
+                          if element.get("truss_id") else "")
+                if (element.get("start_station_mm") is None or
+                        element.get("end_station_mm") is None):
+                    lines.append("    {}  {}{}".format(
+                        element["element_id"], prefix,
+                        element.get("element_kind", "link")))
+                else:
+                    lines.append("    {}  {}{:.3f} -> {:.3f} m".format(
+                        element["element_id"], prefix,
+                        element["start_station_mm"] / 1000.0,
+                        element["end_station_mm"] / 1000.0))
                 lines.append(_force_row("i", element["i"]))
                 lines.append(_force_row("j", element["j"]))
         elif item.get("status") == "preliminary":

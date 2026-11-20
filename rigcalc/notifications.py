@@ -77,6 +77,7 @@ def evaluate_deflections(calculation):
                 "class_name": DEFLECTION_NOTIFICATION_CLASS,
                 "construction_id": construction_id,
                 "source_station_mm": maximum["station_mm"],
+                "source_position_mm": maximum.get("position_mm"),
                 "span_start_mm": span["span_start_mm"],
                 "span_end_mm": span["span_end_mm"],
                 "midspan_deflection_mm": midspan["deflection_mm"],
@@ -117,16 +118,21 @@ def evaluate_internal_forces(calculation, tolerance_ratio=1.0e-6):
             section = element.get("cross_section", {})
             section_id = str(section.get("identifier", ""))
             capacities = section.get("capacities", {})
-            for end_name, station_key in (("i", "start_station_mm"),
-                                          ("j", "end_station_mm")):
+            for end_name, station_key, position_key in (
+                    ("i", "start_station_mm", "start_position_mm"),
+                    ("j", "end_station_mm", "end_position_mm")):
                 forces = element.get(end_name, {})
                 station = element.get(station_key)
-                if station is None:
+                position = element.get(position_key)
+                if station is None and position is None:
                     continue
-                key = (construction_id, round(station, 6), section_id)
+                location = (tuple(round(value, 3) for value in position)
+                            if position is not None else round(station, 6))
+                key = (construction_id, location, section_id)
                 row = grouped.setdefault(key, {
                     "construction_id": construction_id,
                     "source_station_mm": station,
+                    "source_position_mm": position,
                     "cross_section_id": section_id,
                     "components": {},
                 })
@@ -153,8 +159,11 @@ def evaluate_internal_forces(calculation, tolerance_ratio=1.0e-6):
         messages = [_force_text(name, value["actual"], value["capacity"])
                     for name, value in components]
         notifications.append({
-            "id": "internal:{}:{:.3f}:{}".format(
-                row["construction_id"], row["source_station_mm"],
+            "id": "internal:{}:{}:{}".format(
+                row["construction_id"],
+                ("{:.3f}".format(row["source_station_mm"])
+                 if row["source_position_mm"] is None else
+                 "{:.0f},{:.0f},{:.0f}".format(*row["source_position_mm"])),
                 row["cross_section_id"]),
             "type": "internal_force_overload",
             "severity": "error",

@@ -156,7 +156,7 @@ class ContinuousBeamTests(unittest.TestCase):
             reactions[1]["preliminary_high_hook_mass_kg"], 70.0)
         self.assertTrue(result["validation"]["support_model_valid"])
         self.assertTrue(result["writeback_eligible"])
-        self.assertFalse(result["load_transfer_eligible"])
+        self.assertTrue(result["load_transfer_eligible"])
 
     def test_extreme_support_spacing_remains_numerically_auditable(self):
         result = solve(construction(

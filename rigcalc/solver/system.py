@@ -3,13 +3,23 @@
 from .beam_statics import (solve_inclined_two_support_beam, solve_two_support_beam,
                            planar_beam_geometry_issue, trace_construction_loads)
 from .continuous_beam import solve_continuous_beam
-from .inclined_beam import solve_inclined_planar_frame
+from .general_frame import solve_general_frame
 from .validation import guarded_solve, load_transfer_eligible
 
 
+def _is_level_straight_chain(construction):
+    return (construction.stationing == "open_chain" and
+            bool(construction.truss_segments) and
+            all(item.is_line for item in construction.truss_segments) and
+            not planar_beam_geometry_issue(construction))
+
+
 def _solve_local(construction, loads):
-    if planar_beam_geometry_issue(construction):
-        return solve_inclined_planar_frame(construction, loads)
+    # Level straight open chains keep their dedicated, reference-validated
+    # beam solvers.  Every other geometry (inclined, vertical, curved,
+    # cornered, branched, closed, 3D) uses the general 3D frame model.
+    if not _is_level_straight_chain(construction):
+        return solve_general_frame(construction, loads)
     distinct = {round(item.attachment.global_station_mm, 6)
                 for item in construction.supports
                 if item.attachment.global_station_mm is not None}
@@ -87,15 +97,24 @@ def calculate_reactions(document, constructions, progress=None):
                 if reaction["transfer_target_construction_id"] != construction_id:
                     continue
                 station = reaction["transfer_target_station_mm"]
-                if station is not None:
-                    loads.append({
-                        "source_id": "{}:{}".format(
-                            source_id, reaction["support_id"]),
-                        "source_type": "transferred_high_hook_load",
-                        "mass_kg": reaction["preliminary_high_hook_mass_kg"],
-                        "station_mm": station,
-                        "evidence": "construction_graph",
-                    })
+                truss_id = reaction.get("transfer_target_truss_id")
+                local = reaction.get("transfer_target_local_mm")
+                if station is None and (not truss_id or local is None):
+                    # Never drop a load silently.
+                    upstream_issues.append(
+                        "transfer_target_location_unresolved:{}".format(
+                            reaction["support_id"]))
+                    continue
+                loads.append({
+                    "source_id": "{}:{}".format(
+                        source_id, reaction["support_id"]),
+                    "source_type": "transferred_high_hook_load",
+                    "mass_kg": reaction["preliminary_high_hook_mass_kg"],
+                    "station_mm": station,
+                    "truss_id": truss_id,
+                    "local_mm": local,
+                    "evidence": "construction_graph",
+                })
         result = guarded_solve(_solve_local, lookup[construction_id], loads,
                                "linear_construction_solver")
         result["issues"].extend(upstream_issues)

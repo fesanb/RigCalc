@@ -9,13 +9,8 @@ eligible.
 | Geometry or topology | Current result | Required implementation path | Tracking |
 | --- | --- | --- | --- |
 | Level, collinear, open chain | Linear signed beam result plus exhaustive tension-only contact-state search (released hoist must rise; hoist/chain mass always in the top hook, never on the truss). Writeback eligible when the contact state, equilibrium and numerics validate. | Scalable active-set solve beyond 8 hoists (currently `tension_only_active_set_limit_exceeded`); Vectorworks validation (#8). | #7 |
-| Straight inclined planar open chain | Fixed-global-gravity frame diagnostic; signed reactions, active-set diagnostics and numerical evidence are reported. When every hoist has an observed motor point, a corotational tension-only cable model reports slack/taut state, slack gap, re-engagement, and deformed-configuration equilibrium (diagnostic, writeback-blocked). | Promote a validated cable result to the primary calculation; independent reference and Vectorworks validation (#8). | #7 |
-| Vertical truss chain | Explicit `unsupported_vertical_truss_geometry` diagnostic. | Axial/gravity load-path model and support semantics. | #6 |
-| Curved or inverted chain | Explicit diagnostic through topology/geometry validation. | Curved-beam or segmented geometric-nonlinear model. | #6 |
-| Branched construction | Explicit `requires_branched_or_loop_solver` diagnostic. | Graph/frame assembly with branch support conditions. | #6 |
-| Closed construction | Explicit `requires_branched_or_loop_solver` diagnostic. | Closed-frame compatibility and redundant-reaction model. | #6 |
-| Non-collinear planar turns | Explicit non-planar/turn diagnostic. | Planar frame topology and corner-block connection model. | #6 |
-| True 3D load path, torsion or lateral load | Explicit diagnostic; no beam writeback. | Validated 3D frame/contact model with load-direction semantics. | #6 |
+| All other geometry: inclined, vertical, curved (Circle), corners, branched (T/X), closed (rings, grids), true 3D | General 3D frame model (`general_frame.py`): members discretised at every end, support, load and support-span midpoint; arcs as short chords on the resolved centreline; corner blocks as a node at the member-axis intersection. Hoists are tension-only vertical supports solved by an active set with exact complementarity; sway/roll stabilisers (chain pendulum stiffness, weak rotational springs) must carry negligible force or writeback is blocked (a rig on two hoists that would rotate is reported, not calculated). Writeback and load transfer eligible when contact state, equilibrium, numerics and stabiliser checks pass. | Vectorworks validation of each geometry class on the test drawing (#8); bridle legs (#1); horizontal loads/torsion inputs. | #6 |
+| Straight inclined open chain, nonlinear | Corotational tension-only cable model (diagnostic cross-check in `rigcalc_nonlinear_calculation`). | Compare against the general frame on the test drawing. | #7 |
 
 ## Common acceptance gate
 
