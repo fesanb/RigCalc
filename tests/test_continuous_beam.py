@@ -87,10 +87,10 @@ class ContinuousBeamTests(unittest.TestCase):
         result = solve_continuous_beam(
             construction, trace_construction_loads(construction))
         self.assertEqual(result["status"], "preliminary")
-        self.assertFalse(result["writeback_eligible"])
-        self.assertFalse(result["validation"]["support_model_valid"])
-        self.assertIn("tension_only_contact_mass_model_not_implemented",
-                      result["issues"])
+        self.assertTrue(result["writeback_eligible"])
+        self.assertTrue(result["validation"]["support_model_valid"])
+        self.assertEqual(result["validation"]["contact_model"],
+                         "chain_weight_to_top_hook")
         self.assertEqual(
             result["active_set_validation"]["method"],
             "exhaustive_tension_only_active_set")
@@ -140,20 +140,22 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
 
-    def test_engaged_level_contact_state_includes_hoist_chain_mass(self):
+    def test_level_chain_weight_goes_to_top_hook_not_the_truss(self):
         item = construction(10000, [0, 10000], total_mass_kg=100)
         item.supports[0].item.weight_with_chain_kg = 10.0
         item.supports[1].item.weight_with_chain_kg = 20.0
         result = solve(item)
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 100.0,
                                places=6)
-        self.assertAlmostEqual(sum(item["reaction_mass_kg"]
-                                   for item in result["reactions"]), 130.0,
-                               places=6)
+        reactions = result["reactions"]
+        self.assertAlmostEqual(reactions[0]["reaction_mass_kg"], 50.0)
+        self.assertAlmostEqual(reactions[1]["reaction_mass_kg"], 50.0)
+        self.assertAlmostEqual(
+            reactions[0]["preliminary_high_hook_mass_kg"], 60.0)
+        self.assertAlmostEqual(
+            reactions[1]["preliminary_high_hook_mass_kg"], 70.0)
         self.assertTrue(result["validation"]["support_model_valid"])
         self.assertTrue(result["writeback_eligible"])
-        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
-                         10.0)
         self.assertFalse(result["load_transfer_eligible"])
 
     def test_extreme_support_spacing_remains_numerically_auditable(self):
@@ -301,7 +303,7 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertTrue(result["validation"]["vertical_equilibrium_ok"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
 
-    def test_inclined_frame_contact_state_includes_engaged_hoist_chain_mass(self):
+    def test_inclined_frame_chain_weight_goes_to_top_hook(self):
         item = construction(6000, [0, 6000], total_mass_kg=100)
         item.truss_segments[0].end = Point3D(6000, 0, 3000)
         item.supports[0].item.weight_with_chain_kg = 10.0
@@ -310,18 +312,16 @@ class ContinuousBeamTests(unittest.TestCase):
             item, trace_construction_loads(item))
         self.assertEqual(result["status"], "diagnostic")
         self.assertFalse(result["writeback_eligible"])
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 100.0,
                                places=4)
         self.assertAlmostEqual(sum(value["reaction_mass_kg"]
-                                   for value in result["reactions"]), 130.0,
+                                   for value in result["reactions"]), 100.0,
                                places=4)
-        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
-                         10.0)
-        self.assertEqual(result["reactions"][1]["contact_mass_included_kg"],
-                         20.0)
-        self.assertIn(
-            "tension_only_contact_model_diagnostic_not_writeback_source",
-            result["issues"])
+        for reaction, chain in zip(result["reactions"], (10.0, 20.0)):
+            self.assertAlmostEqual(reaction["preliminary_high_hook_mass_kg"],
+                                   reaction["reaction_mass_kg"]+chain)
+        self.assertIn("inclined_geometry_diagnostic_not_writeback_source",
+                      result["issues"])
 
     def test_uniform_load_equilibrium_and_support_deflection_for_2_to_20_supports(self):
         length_mm = 19000.0
@@ -379,7 +379,14 @@ class ContinuousBeamTests(unittest.TestCase):
         self.assertAlmostEqual(sum(
             reaction["reaction_mass_kg"]
             for reaction in result["reactions"]), 2000.0, places=4)
-        self.assertFalse(result["writeback_eligible"])
+        # Load between H1 and H2; the unloaded cantilever beyond H2 rises, so
+        # H3-H5 are slack.  Hand statics: H1 = 2000*14000/31208.
+        reactions = {item["support_id"]: item for item in result["reactions"]}
+        self.assertAlmostEqual(reactions["H1"]["reaction_mass_kg"],
+                               2000.0*14000.0/31208.0, places=4)
+        self.assertEqual([item["support_id"] for item in released],
+                         ["H3", "H4", "H5"])
+        self.assertTrue(result["writeback_eligible"])
         self.assertTrue(result["validation"]["moment_equilibrium_ok"])
         self.assertAlmostEqual(
             result["validation"]["moment_equilibrium_error_kg_m"],
@@ -388,7 +395,7 @@ class ContinuousBeamTests(unittest.TestCase):
             result["validation"]["reaction_equilibrium_correction"]["method"],
             "two_active_support_static_equilibrium")
         report = make_calculation_text({"constructions": [result]})
-        self.assertIn("Validation: equilibrium=yes support model=no", report)
+        self.assertIn("Validation: equilibrium=yes support model=yes", report)
         self.assertIn("Numerical diagnostics: method=scaled_partial_pivoting",
                       report)
         self.assertIn("unconstrained signed reaction", report)

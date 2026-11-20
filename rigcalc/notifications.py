@@ -14,10 +14,9 @@ def evaluate_hoist_overloads(calculation, tolerance_kg=0.1):
         issues = construction.get("issues", [])
         diagnostic_contact_result = (
             status == "diagnostic" or
-            "tension_only_contact_mass_model_not_implemented" in issues or
             "tension_only_active_set_no_feasible_solution" in issues or
-            "tension_only_contact_model_diagnostic_not_writeback_source"
-            in issues)
+            "inclined_geometry_diagnostic_not_writeback_source" in issues or
+            "diagnostic_not_writeback_source" in issues)
         normal_eligible_result = (
             status == "preliminary" and
             construction.get("writeback_eligible", False))
@@ -191,15 +190,16 @@ def evaluate_support_model_failures(calculation):
                     construction_id, hoist_id or "support"),
             })
             continue
-        contact_model_issues = {
-            "tension_only_contact_mass_model_not_implemented",
-            "tension_only_contact_model_diagnostic_not_writeback_source",
+        # Calculated but not yet validated models (currently inclined
+        # chains) must be visibly marked as diagnostic at every hoist.
+        diagnostic_issues = {
+            "inclined_geometry_diagnostic_not_writeback_source",
+            "diagnostic_not_writeback_source",
         }
-        if not contact_model_issues.intersection(issues):
+        if (construction.get("status") != "diagnostic" or
+                not diagnostic_issues.intersection(issues)):
             continue
-        detail = ("physical validation pending" if
-                  "tension_only_contact_model_diagnostic_not_writeback_source"
-                  in issues else "slack / mass model")
+        detail = "inclined model validation pending"
         for reaction in construction.get("reactions", []):
             if (reaction.get("is_structural_link") or
                     reaction.get("support_kind") != "hoist"):

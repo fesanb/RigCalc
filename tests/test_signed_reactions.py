@@ -11,7 +11,7 @@ def attached_support(identifier, station):
 
 
 class SignedReactionTests(unittest.TestCase):
-    def test_negative_reaction_is_retained_with_contact_model_issue(self):
+    def test_negative_reaction_is_retained_and_writeback_blocked(self):
         construction = Construction(
             "C", [], [], "open_chain",
             supports=[attached_support("H1", 0),
@@ -23,8 +23,9 @@ class SignedReactionTests(unittest.TestCase):
         result = solve_two_support_beam(construction, loads)
         self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], -100)
         self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 200)
-        self.assertIn("tension_only_contact_mass_model_not_implemented",
+        self.assertIn("tension_only_active_set_no_feasible_solution",
                       result["issues"])
+        self.assertFalse(result["writeback_eligible"])
 
 
 if __name__ == "__main__":

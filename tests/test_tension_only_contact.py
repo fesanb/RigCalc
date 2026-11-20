@@ -1,13 +1,15 @@
 """Tension-only hoist contact: release rule, cable slack and re-engagement.
 
 Reference case (T10#3-style, GitHub issue #7): a 10 m truss on hoists at
-0, 2 and 8 m, 50 kg uniform self-weight, 120 kg at the 10 m overhang and
-15 kg hoist/chain mass per hoist.  Unconstrained, H2 needs a downward
-reaction (uplift).  Physically the truss rises at H2 so its chain goes slack;
-H1 and H3 carry the load.  Hand statics about H1 with H2 released:
+0, 2 and 8 m, 50 kg uniform self-weight, 60 kg at the 10 m overhang and
+15 kg hoist/chain mass per hoist.  Hoist/chain mass is never a truss load;
+it always ends in the top hook.  Unconstrained, H2 needs a downward reaction
+(uplift).  Physically the truss rises at H2 so its chain goes slack; H1 and
+H3 carry the load.  Hand statics about H1 with H2 released:
 
-    H3 = (50*5 + 120*10)/8 + 15 = 196.25 kg
-    H1 = 170 - 181.25 + 15    =   3.75 kg
+    H3 = (50*5 + 60*10)/8 = 106.25 kg
+    H1 = 110 - 106.25     =   3.75 kg
+    High Hook = reaction + 15 kg; slack H2 High Hook = 15 kg
 """
 
 import unittest
@@ -28,11 +30,13 @@ from tests.test_continuous_beam import attachment, construction
 
 INCLINE_RISE_MM = 5000.0
 EXPECTED_H1_KG = 3.75
-EXPECTED_H3_KG = 196.25
+EXPECTED_H3_KG = 106.25
+OVERHANG_LOAD_KG = 60.0
+CHAIN_KG = 15.0
 
 
-def overhang_case(rise_mm=0.0, motor_points=False, contact_mass_kg=15.0):
-    load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
+def overhang_case(rise_mm=0.0, motor_points=False, contact_mass_kg=CHAIN_KG):
+    load = PointLoad("P", "", Point3D(10000, 0), "Load", OVERHANG_LOAD_KG)
     item = construction(
         10000, [0, 2000, 8000], total_mass_kg=50,
         point_loads=[AttachedObject(load, attachment(10000))])
@@ -58,6 +62,18 @@ class ReleasedContactRuleTests(unittest.TestCase):
         self.assertTrue(released_contact_is_slack(0.0))
         self.assertFalse(released_contact_is_slack(-0.004))
         self.assertFalse(released_contact_is_slack(None))
+
+    def test_overhang_beyond_last_hoist_has_no_feasible_state(self):
+        # Without chain mass on the truss, 120 kg at the overhang puts the
+        # centre of gravity beyond H3: the truss would tip.  Fail closed.
+        load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
+        item = construction(
+            10000, [0, 2000, 8000], total_mass_kg=50,
+            point_loads=[AttachedObject(load, attachment(10000))])
+        result = solve_continuous_beam(item, trace_construction_loads(item))
+        self.assertIn("tension_only_active_set_no_feasible_solution",
+                      result["issues"])
+        self.assertFalse(result["writeback_eligible"])
 
     def test_level_chain_releases_the_uplift_hoist_not_a_sinking_one(self):
         result = solve_continuous_beam(
@@ -152,24 +168,25 @@ class InclinedCableContactTests(unittest.TestCase):
         self.assertAlmostEqual(reactions["H3"]["reaction_mass_kg"],
                                EXPECTED_H3_KG, delta=0.5)
 
-    def test_slack_chain_mass_is_not_carried_by_the_truss(self):
+    def test_chain_weight_goes_to_top_hook_not_the_truss(self):
         result = self.solve()
         reactions = by_id(result)
-        self.assertNotIn("contact_mass_included_kg", reactions["H2"])
-        self.assertEqual(reactions["H1"]["contact_mass_included_kg"], 15.0)
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 200.0)
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 110.0)
+        self.assertFalse(any(item["source_type"] == "hoist_chain_contact_mass"
+                             for item in result["loads"]))
+        self.assertAlmostEqual(reactions["H1"]["preliminary_high_hook_mass_kg"],
+                               reactions["H1"]["reaction_mass_kg"]+CHAIN_KG)
+        self.assertAlmostEqual(reactions["H2"]["preliminary_high_hook_mass_kg"],
+                               CHAIN_KG)
         validation = result["contact_state_validation"]
-        self.assertTrue(validation["consistent"])
+        self.assertEqual(validation["method"],
+                         "tension_only_cable_slack_reengagement")
         self.assertEqual(validation["released_support_ids"], ["H2"])
-        self.assertEqual(validation["iterations"][0]["engaged_contact_mass"],
-                         ["H1", "H2", "H3"])
-        self.assertNotIn("tension_only_contact_state_not_consistent",
-                         result["issues"])
 
     def test_unconstrained_signed_result_is_retained(self):
         reactions = by_id(self.solve())
         self.assertLess(reactions["H2"]["unconstrained_reaction_mass_kg"],
-                        -50.0)
+                        -20.0)
         self.assertGreater(reactions["H1"]["unconstrained_reaction_mass_kg"],
                            0.0)
 
@@ -185,11 +202,10 @@ class InclinedCableContactTests(unittest.TestCase):
 
     def test_report_shows_slack_chain_and_contact_state(self):
         text = make_calculation_text({"constructions": [self.solve()]})
-        self.assertIn("Contact state: method=cable_slack_reengagement_fixed_point "
-                      "consistent=yes", text)
-        self.assertIn("slack chains=H2", text)
+        self.assertIn("Contact state: method=tension_only_cable_slack_"
+                      "reengagement slack chains=H2", text)
         self.assertIn("[chain slack", text)
-        self.assertIn("[unconstrained signed reaction: -72.", text)
+        self.assertIn("[unconstrained signed reaction: -22.", text)
 
     def test_cable_and_fixed_contact_enumeration_agree(self):
         cable = by_id(self.solve())

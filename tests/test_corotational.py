@@ -98,8 +98,7 @@ class CorotationalTests(unittest.TestCase):
                                    for item in result["reactions"]), 100.0,
                                places=3)
         self.assertFalse(result["writeback_eligible"])
-        self.assertIn("tension_only_contact_mass_model_not_implemented",
-                      result["issues"])
+        self.assertIn("diagnostic_not_writeback_source", result["issues"])
 
     def test_inclined_overhang_preserves_uplift_when_no_contact_state_is_feasible(self):
         load = PointLoad("P", "", Point3D(10000, 0), "Load", 120.0)
@@ -116,28 +115,22 @@ class CorotationalTests(unittest.TestCase):
         self.assertLess(result["reactions"][0]["reaction_mass_kg"], 0.0)
         self.assertGreater(result["reactions"][1]["reaction_mass_kg"], 0.0)
 
-    def test_inclined_contact_state_includes_engaged_hoist_chain_mass(self):
+    def test_inclined_chain_weight_goes_to_top_hook_not_the_truss(self):
         item = construction(6000, [0, 6000], total_mass_kg=100)
         item.truss_segments[0].end = Point3D(6000, 0, 3000)
         item.supports[0].item.weight_with_chain_kg = 10.0
         item.supports[1].item.weight_with_chain_kg = 20.0
         result = solve_corotational_beam(
             item, trace_construction_loads(item))
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0,
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 100.0,
                                places=3)
         self.assertAlmostEqual(sum(item["reaction_mass_kg"]
-                                   for item in result["reactions"]), 130.0,
+                                   for item in result["reactions"]), 100.0,
                                places=3)
-        self.assertEqual(result["reactions"][0]["contact_mass_included_kg"],
-                         10.0)
-        self.assertEqual(result["reactions"][1]["contact_mass_included_kg"],
-                         20.0)
-        self.assertIn(
-            "tension_only_contact_model_diagnostic_not_writeback_source",
-            result["issues"])
-        self.assertNotIn("tension_only_contact_mass_model_not_implemented",
-                         result["issues"])
-        self.assertIn("includes engaged contact mass",
+        for reaction, chain in zip(result["reactions"], (10.0, 20.0)):
+            self.assertAlmostEqual(reaction["preliminary_high_hook_mass_kg"],
+                                   reaction["reaction_mass_kg"]+chain)
+        self.assertIn("+ hoist/chain 10.00 kg",
                       make_calculation_text({"constructions": [result]}))
 
     def test_inclined_adapter_uses_observed_motor_points_as_cables(self):
@@ -150,7 +143,7 @@ class CorotationalTests(unittest.TestCase):
         result = solve_corotational_beam(
             item, trace_construction_loads(item))
         self.assertTrue(result["converged"])
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 130.0)
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 100.0)
         self.assertTrue(all(item.get("support_force_model") ==
                             "tension_only_cable"
                             for item in result["reactions"]))

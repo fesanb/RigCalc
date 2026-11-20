@@ -3,12 +3,14 @@
 Two support models are available:
 
 * When every hoist has an observed motor point above its pickup, hoists are
-  tension-only cables.  The engaged hoist/chain mass is applied at taut
-  pickups only, and slack/re-engagement is iterated to a consistent state.
-  The signed fixed-support solution is retained as the unconstrained
-  diagnostic.
+  tension-only cables that go slack when the pickup rises and re-engage when
+  it is pulled down.  The signed fixed-support solution is retained as the
+  unconstrained diagnostic.
 * Otherwise hoists are fixed vertical supports and the tension-only contact
   states are enumerated exhaustively.
+
+Hoist/chain mass is never a truss load; it always ends in the top hook
+(High Hook = truss reaction + WeightWithChain).
 
 Both remain diagnostic and writeback-blocked until the inclined model has
 passed independent and Vectorworks validation (GitHub issues #7 and #8).
@@ -24,8 +26,7 @@ from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
 from .corotational import (CorotationalElement, CorotationalModel,
                            CorotationalCable, CorotationalNode,
                            solve_corotational)
-from .contact import (RELEASED_CONTACT_RULE, contact_mass_by_support,
-                      engaged_contact_mass_loads, released_contact_is_slack)
+from .contact import RELEASED_CONTACT_RULE, released_contact_is_slack
 from .deflection import build_deflection_summary, support_span_midpoints
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
 
@@ -110,17 +111,13 @@ def _uses_cable_model(construction):
     return bool(cables) and len(cables) == len(hoists)
 
 
-MAX_CONTACT_STATE_ITERATIONS = 12
-
-
 def _solve_cable_contact_state(construction, loads):
     """Tension-only cable solution with slack and re-engagement.
 
     The signed result with every support fixed is solved first and retained
-    as the unconstrained diagnostic.  The cable solve then starts with every
-    chain engaged.  A chain that goes slack no longer carries its hoist/chain
-    mass on the truss; a slack chain that becomes taut again carries it.  The
-    engaged set is iterated until it is self-consistent.
+    as the unconstrained diagnostic.  The cable solve itself decides which
+    chains are taut and which are slack; hoist/chain mass is not a truss
+    load, so the contact state does not change the applied loads.
     """
     all_ids = {item.item.id for item in construction.supports
                if item.attachment.global_station_mm is not None}
@@ -128,25 +125,8 @@ def _solve_cable_contact_state(construction, loads):
         construction, loads, _active_ids=all_ids)
     signed = {item["support_id"]: item["reaction_mass_kg"]
               for item in unconstrained.get("reactions", [])}
-    engaged = frozenset(item.item.id for item in _cable_supports(construction))
-    history, seen, result, consistent = [], set(), None, False
-    for _ in range(MAX_CONTACT_STATE_ITERATIONS):
-        seen.add(engaged)
-        result = solve_inclined_corotational_beam(
-            construction, loads, _cable_engaged_ids=engaged)
-        if result["status"] != "diagnostic":
-            break
-        taut = frozenset(item["support_id"] for item in result["reactions"]
-                         if item.get("support_force_model") ==
-                         "tension_only_cable" and item["support_active"])
-        history.append({"engaged_contact_mass": sorted(engaged),
-                        "taut_after_solve": sorted(taut)})
-        if taut == engaged:
-            consistent = True
-            break
-        if taut in seen:
-            break
-        engaged = taut
+    result = solve_inclined_corotational_beam(
+        construction, loads, _use_cables=True)
     for reaction in result["reactions"]:
         reaction["unconstrained_reaction_mass_kg"] = signed.get(
             reaction["support_id"])
@@ -154,23 +134,19 @@ def _solve_cable_contact_state(construction, loads):
     if not unconstrained.get("converged"):
         result["issues"].append("unconstrained_signed_solution_not_converged")
     result["contact_state_validation"] = {
-        "method": "cable_slack_reengagement_fixed_point",
-        "consistent": consistent,
-        "iterations": history,
+        "method": "tension_only_cable_slack_reengagement",
         "released_support_ids": sorted(
             item["support_id"] for item in result["reactions"]
             if item.get("support_force_model") == "tension_only_cable" and
             not item["support_active"]),
     }
-    if result["status"] == "diagnostic" and not consistent:
-        result["issues"].append("tension_only_contact_state_not_consistent")
     return result
 
 
 def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                                      _signed_reactions=None,
-                                     _cable_engaged_ids=None):
-    if (_active_ids is None and _cable_engaged_ids is None and
+                                     _use_cables=False):
+    if (_active_ids is None and not _use_cables and
             _uses_cable_model(construction)):
         return _solve_cable_contact_state(construction, loads)
     all_supports = sorted(
@@ -189,7 +165,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
             "direction": "fixed_global_negative_z",
             "reference_configuration": "undeformed_inclined_chord_geometry",
             "distributed_load": "equivalent_nodal_gravity_load_not_follower",
-            "contact_mass": "engaged hoist/chain mass is a point load",
+            "hoist_chain_mass": "top hook only; never a truss load",
         },
         "writeback_eligible": False,
         "load_transfer_eligible": False,
@@ -212,18 +188,10 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     if any(x is None or z is None for x, z in points):
         result["issues"].append("unsupported_partial_inclined_station")
         return result
-    use_cables = _cable_engaged_ids is not None
+    use_cables = bool(_use_cables)
     cable_supports = _cable_supports(construction) if use_cables else []
     if use_cables:
-        # Hoist/chain mass belongs on the truss only at an engaged (taut)
-        # contact.  The caller iterates the engaged set to consistency.
-        loads = list(loads) + engaged_contact_mass_loads(
-            [item for item in cable_supports
-             if item.item.id in _cable_engaged_ids])
-        result["loads"] = loads
         result["method"] = "inclined_planar_corotational_tension_only_cable"
-        result["total_applied_mass_kg"] = sum(
-            item["mass_kg"] for item in loads)
     cable_ids = {item.item.id for item in cable_supports}
     active_stations = {round(item.attachment.global_station_mm, 6)
                        for item in supports}
@@ -327,17 +295,6 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
         else:
             result["reactions"].append(_reaction_record(
                 support, solved["node_reactions"][nodes[index].id][1]/GRAVITY_M_S2))
-    contact_masses = contact_mass_by_support(loads)
-    for reaction in result["reactions"]:
-        mass = contact_masses.get(reaction["support_id"], 0.0)
-        if mass:
-            reaction["contact_mass_included_kg"] = mass
-            # The reaction already includes this contact load. It must never
-            # be added again as an apparently approved High Hook value.
-            reaction["preliminary_high_hook_mass_kg"] = (
-                reaction["reaction_mass_kg"])
-            reaction["high_hook_mass_basis"] = (
-                "reaction_includes_engaged_contact_mass_diagnostic")
     if _signed_reactions is None:
         _signed_reactions = [dict(item) for item in result["reactions"]]
     if _active_ids is None and not use_cables:
@@ -351,8 +308,7 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                                    if item.item.is_structural_link})
                     if len(active_ids) < 2:
                         continue
-                    candidate_loads = list(loads) + engaged_contact_mass_loads(
-                        selected)
+                    candidate_loads = list(loads)
                     candidate = solve_inclined_corotational_beam(
                         construction, candidate_loads, active_ids,
                         _signed_reactions)
@@ -385,7 +341,6 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
                 result["active_set_validation"] = {
                     "method": "exhaustive_inclined_corotational_contact_state",
                     "candidate_sets_valid": len(candidates),
-                    "contact_mass_model": "engaged_support_point_load",
                     "released_support_displacement_rule": RELEASED_CONTACT_RULE,
                 }
                 return result
@@ -465,9 +420,4 @@ def solve_inclined_corotational_beam(construction, loads, _active_ids=None,
     if not solved["converged"]:
         result["issues"].append("nonlinear_solution_did_not_converge")
     result["issues"].append("diagnostic_not_writeback_source")
-    if contact_masses:
-        result["issues"].append(
-            "tension_only_contact_model_diagnostic_not_writeback_source")
-    else:
-        result["issues"].append("tension_only_contact_mass_model_not_implemented")
     return result

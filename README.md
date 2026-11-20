@@ -27,9 +27,11 @@ recorded confidence and distance evidence.
 Underload, uplift, negative reactions, and signed deflections are important
 engineering diagnostics. RigCalc must preserve and report them, including the
 amount and affected location. A physically admissible tension-only solution
-must additionally account for chain slack, re-engagement, and hoist/chain
-mass; until available, writeback remains blocked but the diagnostic result is
-still reported. Every discovered hoist must receive either a calculated result
+must additionally account for chain slack and re-engagement; where it is not
+available, writeback remains blocked but the diagnostic result is still
+reported. Hoist and chain mass (`WeightWithChain`) always ends in the top hook,
+whatever the hoist orientation: it is never a truss load, and High Hook = truss
+reaction + `WeightWithChain`. Every discovered hoist must receive either a calculated result
 or an explicit `0.00 kN` outcome with a clear drawing and report reason.
 
 > [!WARNING]
@@ -235,11 +237,14 @@ selected. The corotational solver is diagnostic-only until it implements the
 same tension-only hoist support model as the linear solver. Hoist supports that
 would require a negative reaction are released and the system is solved again;
 the original signed reaction remains in the report as uplift diagnostic data.
-High Hook writeback requires a validated physical tension-only contact model.
-The current implementation does not yet model chain slack, re-engagement and
-hoist/chain mass at contact, so every hoist-supported construction remains
-read-only even when its diagnostic reactions are well equilibrated. Forces in
-eligible structural Truss Cross connections are written back in newtons.
+High Hook writeback requires a validated tension-only support state. For level
+open chains the hoist contact states are enumerated exhaustively (up to eight
+hoists): a released chain must be slack, meaning its pickup rises, and every
+engaged chain must carry a non-negative reaction. High Hook is the truss
+reaction plus `WeightWithChain`; a slack hoist's High Hook is its
+`WeightWithChain` alone, and slack hoists are not written back. Inclined chains
+remain diagnostic and read-only. Forces in eligible structural Truss Cross
+connections are written back in newtons.
 
 The diagnostic corotational branch models distributed mass as a fixed global
 vertical gravity load based on the undeformed station geometry; it is not a

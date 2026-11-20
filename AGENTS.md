@@ -23,9 +23,13 @@ fail closed and report the uncertainty instead of guessing.
   the model and report.
 - Always calculate and report the unconstrained/signed structural result,
   including uplift, underload, negative reactions, and signed deflection.
-  A unilateral/tension-only physical solution must additionally model slack,
-  re-engagement, and the hoist/chain mass at the contact point; it must not
-  discard the diagnostic result merely because a support is infeasible.
+  A unilateral/tension-only physical solution must additionally model slack
+  and re-engagement; it must not discard the diagnostic result merely because
+  a support is infeasible.
+- Hoist and chain mass (`WeightWithChain`) always ends in the top hook,
+  whatever the hoist orientation (`Hoist Up` or `Hoist Down`). It is never a
+  truss load: High Hook = truss reaction + `WeightWithChain`, and the truss
+  reaction alone decides whether a chain is taut or slack.
 - Every discovered hoist receives an explicit outcome. If no load can be
   calculated, emit `0.00 kN` and a precise drawing/report reason (for example
   no viable carrier, too far from geometry, ambiguity, or insufficient

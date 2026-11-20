@@ -45,24 +45,15 @@ class NotificationEvaluationTests(unittest.TestCase):
         self.assertEqual(evaluate_hoist_overloads(
             calculation(reaction(1100, 1000, kind="dead_hang"))), [])
 
-    def test_contact_model_blocked_overload_remains_visible_as_diagnostic(self):
+    def test_inclined_diagnostic_overload_remains_visible(self):
         value = calculation(reaction(1100, 1000))
         value["constructions"][0].update({
-            "writeback_eligible": False,
-            "issues": ["tension_only_contact_mass_model_not_implemented"],
+            "status": "diagnostic", "writeback_eligible": False,
+            "issues": ["inclined_geometry_diagnostic_not_writeback_source"],
         })
         item = evaluate_hoist_overloads(value)[0]
         self.assertIn("DIAGNOSTIC OVERLOAD", item["message"])
 
-    def test_contact_model_pending_validation_overload_remains_visible(self):
-        value = calculation(reaction(1100, 1000))
-        value["constructions"][0].update({
-            "writeback_eligible": False,
-            "issues": [
-                "tension_only_contact_model_diagnostic_not_writeback_source"],
-        })
-        self.assertIn("DIAGNOSTIC OVERLOAD",
-                      evaluate_hoist_overloads(value)[0]["message"])
 
     def test_deflection_is_an_orange_informational_marker(self):
         value = calculation()
@@ -106,27 +97,19 @@ class NotificationEvaluationTests(unittest.TestCase):
         self.assertEqual(items[0]["class_name"], "RigCalc-Load")
         self.assertIn("cable slack / uplift", items[0]["message"])
 
-    def test_missing_contact_mass_model_marks_each_affected_hoist(self):
+    def test_inclined_diagnostic_marks_each_affected_hoist(self):
         value = calculation(reaction(120, 250, "H1"),
                             reaction(130, 250, "H2"))
         value["constructions"][0].update({
-            "writeback_eligible": False,
-            "issues": ["tension_only_contact_mass_model_not_implemented"],
+            "status": "diagnostic", "writeback_eligible": False,
+            "issues": ["inclined_geometry_diagnostic_not_writeback_source"],
         })
         items = evaluate_support_model_failures(value)
         self.assertEqual([item["support_id"] for item in items], ["H1", "H2"])
-        self.assertTrue(all("diagnostic only" in item["message"]
-                            for item in items))
+        self.assertTrue(all("diagnostic only" in item["message"] and
+                            "inclined model validation pending" in
+                            item["message"] for item in items))
 
-    def test_contact_model_pending_validation_is_marked(self):
-        value = calculation(reaction(120, 250, "H1"))
-        value["constructions"][0].update({
-            "writeback_eligible": False,
-            "issues": [
-                "tension_only_contact_model_diagnostic_not_writeback_source"],
-        })
-        item = evaluate_support_model_failures(value)[0]
-        self.assertIn("physical validation pending", item["message"])
 
 
 class FakeVS:

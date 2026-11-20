@@ -25,11 +25,14 @@ class CalculationTests(unittest.TestCase):
         constructions = build_constructions(document)
         result = calculate_reactions(document, constructions)["constructions"][0]
         self.assertEqual(result["status"], "preliminary")
-        self.assertAlmostEqual(result["total_applied_mass_kg"], 220)
-        self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], 135)
-        self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 85)
+        # Hoist/chain mass is not a truss load; it is added in the top hook.
+        self.assertAlmostEqual(result["total_applied_mass_kg"], 200)
+        self.assertAlmostEqual(result["reactions"][0]["reaction_mass_kg"], 125)
+        self.assertAlmostEqual(result["reactions"][1]["reaction_mass_kg"], 75)
         self.assertAlmostEqual(
             result["reactions"][0]["preliminary_high_hook_mass_kg"], 135)
+        self.assertAlmostEqual(
+            result["reactions"][1]["preliminary_high_hook_mass_kg"], 85)
         self.assertTrue(result["validation"]["calculated"])
         self.assertTrue(result["validation"]["equilibrium_valid"])
         self.assertTrue(result["validation"]["support_model_valid"])
@@ -37,7 +40,7 @@ class CalculationTests(unittest.TestCase):
         self.assertFalse(result["load_transfer_eligible"])
         self.assertEqual(
             result["validation"]["contact_model"],
-            "two_support_tension_only_with_engaged_contact_mass")
+            "two_support_tension_only_chain_weight_to_top_hook")
 
     def test_configured_cable_rate_is_applied_over_each_truss_length(self):
         start, end = Point3D(0, 0), Point3D(10000, 0)

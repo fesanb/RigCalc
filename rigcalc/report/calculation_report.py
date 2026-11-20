@@ -48,11 +48,8 @@ def make_calculation_text(data):
         contact_state = item.get("contact_state_validation")
         if contact_state:
             lines.append(
-                "Contact state: method={} consistent={} iterations={} "
-                "slack chains={}".format(
+                "Contact state: method={} slack chains={}".format(
                     contact_state.get("method", "-"),
-                    "yes" if contact_state.get("consistent") else "no",
-                    len(contact_state.get("iterations", [])),
                     ", ".join(contact_state.get("released_support_ids", []))
                     or "none"))
         numerical = item.get("numerical_diagnostics", {})
@@ -74,27 +71,16 @@ def make_calculation_text(data):
             support_label = reaction.get("support_hoist_id") or reaction["support_id"]
             if support_label != reaction["support_id"]:
                 support_label += " [{}]".format(reaction["support_id"])
-            if reaction.get("high_hook_mass_basis"):
-                reaction_line = (
-                    "  {} at {:.3f} m: reaction {:.2f} kg includes engaged "
-                    "contact mass {:.2f} kg; diagnostic high hook {:.2f} kg "
-                    "(capacity {:.2f} kg){}".format(
-                        support_label, reaction["station_mm"] / 1000.0,
-                        reaction["reaction_mass_kg"],
-                        reaction.get("contact_mass_included_kg", 0.0),
-                        reaction["preliminary_high_hook_mass_kg"],
-                        reaction["capacity_kg"], support_state))
-            else:
-                reaction_line = (
-                    "  {} at {:.3f} m: reaction {:.2f} kg + hoist/chain {:.2f} kg "
-                    "= preliminary high hook {:.2f} kg (capacity {:.2f} kg){}".format(
-                        support_label, reaction["station_mm"] / 1000.0,
-                        reaction["reaction_mass_kg"],
-                        reaction["hoist_and_chain_mass_kg"],
-                        reaction["preliminary_high_hook_mass_kg"],
-                        reaction["capacity_kg"],
-                        support_state,
-                    ))
+            reaction_line = (
+                "  {} at {:.3f} m: reaction {:.2f} kg + hoist/chain {:.2f} kg "
+                "= preliminary high hook {:.2f} kg (capacity {:.2f} kg){}".format(
+                    support_label, reaction["station_mm"] / 1000.0,
+                    reaction["reaction_mass_kg"],
+                    reaction["hoist_and_chain_mass_kg"],
+                    reaction["preliminary_high_hook_mass_kg"],
+                    reaction["capacity_kg"],
+                    support_state,
+                ))
             unconstrained = reaction.get("unconstrained_reaction_mass_kg")
             if (unconstrained is not None and
                     abs(unconstrained-reaction["reaction_mass_kg"]) > 1.0e-6):
