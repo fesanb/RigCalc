@@ -21,6 +21,13 @@ def inclined_station_coordinates(construction):
                if identifier in trusses]
     if not ordered or not spans:
         return None, "missing_ordered_inclined_geometry"
+    for truss in ordered:
+        # Corner blocks and curved (Circle) segments carry no straight
+        # start/end chord.  They need a corner or curved-member model; an
+        # inclined straight-chain reduction must not guess their geometry.
+        if not truss.is_line:
+            return None, "unsupported_non_line_member_in_inclined_chain:{}:{}".format(
+                truss.id, truss.item_type or "unknown")
     origin = ordered[0].start
     direction = None
     for truss in ordered:

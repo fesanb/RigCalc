@@ -29,6 +29,37 @@ class ScannerDeduplicationTests(unittest.TestCase):
         })
         self.assertAlmostEqual(support.position.z, 5542.0)
 
+    def test_zero_bottom_trim_is_a_real_elevation_not_missing(self):
+        # A truss on the floor has TrussBottomTrim 0; the motor centre is
+        # metres above it.  Falling back to the centre detached every hoist.
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
+            "LoadTrim": "143,5", "TrussBottomTrim": "0e00",
+        })
+        self.assertAlmostEqual(support.position.z, 0.0)
+        self.assertEqual(
+            support.geometry_fields["RigCalcLowerConnectionSource"],
+            "TrussBottomTrim")
+
+    def test_zero_load_trim_is_used_for_inverted_hoist(self):
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Up", "OriginX": "100", "OriginY": "200",
+            "LoadTrim": "0", "TrussBottomTrim": "-143,5",
+        })
+        self.assertAlmostEqual(support.position.z, 0.0)
+        self.assertEqual(
+            support.geometry_fields["RigCalcLowerConnectionSource"],
+            "LoadTrim")
+
+    def test_missing_trims_fall_back_to_geometry_centre_explicitly(self):
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
+        })
+        self.assertAlmostEqual(support.position.z, 1800.0)
+        self.assertEqual(
+            support.geometry_fields["RigCalcLowerConnectionSource"],
+            "geometry_centre_fallback")
+
     def test_soft_goods_attaches_at_top_trim_not_geometry_centre(self):
         item = _parse_load(FakeVS(), "handle", "L1", "Soft Goods", {
             "TopTrim": "4959,36", "Z Location": "1815,86",

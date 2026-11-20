@@ -9,7 +9,7 @@ from .deflection import (build_deflection_summary,
                          support_span_midpoints)
 from .corotational import (CorotationalElement, CorotationalModel,
                            CorotationalNode, solve_corotational)
-from .validation import finalize_eligibility
+from .validation import finalize_eligibility, guarded_solve
 
 
 def solve_corotational_beam(construction, loads, progress=None):
@@ -208,8 +208,10 @@ def calculate_corotational_reactions(document, constructions, progress=None):
             return solved[construction_id]
         construction = lookup[construction_id]
         if construction_id in visiting:
-            result = solve_corotational_beam(
-                construction, trace_construction_loads(construction))
+            result = guarded_solve(
+                solve_corotational_beam, construction,
+                trace_construction_loads(construction),
+                "corotational_construction_solver")
             result["issues"].append("cyclic_load_transfer_graph")
             solved[construction_id] = result
             return result
@@ -242,8 +244,9 @@ def calculate_corotational_reactions(document, constructions, progress=None):
         callback = None
         if progress:
             callback = lambda state: progress(construction_id, state)
-        result = solve_corotational_beam(
-            construction, loads, progress=callback)
+        result = guarded_solve(
+            solve_corotational_beam, construction, loads,
+            "corotational_construction_solver", progress=callback)
         for source_id in upstream_failed:
             result["issues"].append(
                 "upstream_nonlinear_load_transfer_ineligible:{}".format(

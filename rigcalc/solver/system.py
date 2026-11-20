@@ -4,7 +4,7 @@ from .beam_statics import (solve_inclined_two_support_beam, solve_two_support_be
                            planar_beam_geometry_issue, trace_construction_loads)
 from .continuous_beam import solve_continuous_beam
 from .inclined_beam import solve_inclined_planar_frame
-from .validation import load_transfer_eligible
+from .validation import guarded_solve, load_transfer_eligible
 
 
 def _solve_local(construction, loads):
@@ -53,9 +53,10 @@ def calculate_reactions(document, constructions, progress=None):
         if construction_id in solved:
             return solved[construction_id]
         if construction_id in visiting:
-            result = _solve_local(
-                lookup[construction_id],
-                trace_construction_loads(lookup[construction_id]))
+            result = guarded_solve(
+                _solve_local, lookup[construction_id],
+                trace_construction_loads(lookup[construction_id]),
+                "linear_construction_solver")
             result["status"] = "not_calculated"
             result["writeback_eligible"] = False
             result["load_transfer_eligible"] = False
@@ -95,7 +96,8 @@ def calculate_reactions(document, constructions, progress=None):
                         "station_mm": station,
                         "evidence": "construction_graph",
                     })
-        result = _solve_local(lookup[construction_id], loads)
+        result = guarded_solve(_solve_local, lookup[construction_id], loads,
+                               "linear_construction_solver")
         result["issues"].extend(upstream_issues)
         if construction_id in cyclic_ids:
             result["status"] = "not_calculated"

@@ -40,3 +40,33 @@ def finalize_eligibility(result, support_model_valid, numerical_valid=True,
     result["load_transfer_eligible"] = bool(
         eligible and permit_load_transfer)
     return eligible
+
+
+def guarded_solve(solver, construction, loads, method, **kwargs):
+    """Run one construction solver without letting it abort the whole run.
+
+    An unexpected exception is a defect in RigCalc, not a calculation result.
+    It is reported as an explicit, writeback-blocked ``not_calculated``
+    construction with the error text, so its hoists receive a 0.00 kN outcome
+    with that reason and every other construction is still calculated.
+    """
+    try:
+        return solver(construction, loads, **kwargs)
+    except Exception as error:  # noqa: BLE001 - fail closed per construction
+        import traceback
+        return {
+            "construction_id": construction.id,
+            "construction_name": getattr(construction, "label",
+                                         construction.id),
+            "status": "not_calculated",
+            "method": method,
+            "loads": loads,
+            "writeback_eligible": False,
+            "load_transfer_eligible": False,
+            "total_applied_mass_kg": sum(
+                item.get("mass_kg", 0.0) for item in loads),
+            "reactions": [], "stations": [], "element_forces": [],
+            "issues": ["internal_solver_error:{}: {}".format(
+                type(error).__name__, error)],
+            "internal_error_traceback": traceback.format_exc(),
+        }
