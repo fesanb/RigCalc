@@ -38,5 +38,7 @@ class Bridle:
     weight_kg: float = 0.0
     weight_raw_kg: float = 0.0
     legs: List[BridleLeg] = field(default_factory=list)
+    # The down leg is the hoist hanging from the apex (N in Vectorworks).
+    down_leg_max_force_n: Optional[float] = None
     object_uuid: str = ""
     source_ref: Any = field(default=None, repr=False, compare=False)

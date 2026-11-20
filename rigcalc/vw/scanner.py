@@ -292,7 +292,9 @@ def _parse_bridle(vs, handle, object_id, fields, safety_factor=1.0):
         apex=Point3D(x, y, apex_z),
         connected_hoist_uuid=str(fields.get("ConnectedHoistUUID", "")),
         weight_kg=weight_raw*safety_factor, weight_raw_kg=weight_raw,
-        legs=legs, object_uuid=_object_uuid(vs, handle), source_ref=handle)
+        legs=legs,
+        down_leg_max_force_n=safe_float(fields.get("ForceDownLegMax")),
+        object_uuid=_object_uuid(vs, handle), source_ref=handle)
 
 
 def _parse_house_rigging_point(vs, handle, object_id, fields):

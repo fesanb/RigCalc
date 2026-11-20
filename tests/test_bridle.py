@@ -25,6 +25,7 @@ B1_FIELDS = {
     "AngleLeg1": "77,65°", "AngleLeg2": "78,72°",
     "TrimmLeg1": "2,331149358298342e04", "TrimmLeg2": "2,331149358298342e04",
     "ConnectedHoistUUID": "97532407-7e87-45ba-ada6-6ed8eb0f22df",
+    "ForceDownLegMax": "14709,97",
 }
 HOUSE_POINTS = [(10680.0, -18440.0), (11560.0, -15460.0),
                 (14960.0, -13320.0), (16560.0, -19640.0)]
@@ -84,6 +85,13 @@ class BridleTests(unittest.TestCase):
         # The anchor force equals the Vectorworks HouseRiggingPoint force.
         self.assertAlmostEqual(legs[1]["anchor_force_n"][2], -502.1, delta=1.0)
         self.assertIn("Leg 1 -> R0", make_bridle_text([result]))
+
+    def test_down_leg_is_the_hoist_high_hook(self):
+        result = calculate_bridles(document(), outcome())[0]
+        self.assertAlmostEqual(result["down_leg_force_n"], 85.91*9.80665,
+                               places=3)
+        self.assertAlmostEqual(result["down_leg_max_force_n"], 14709.97)
+        self.assertNotIn("down_leg_overload", result)
 
     def test_unvalidated_hoist_load_blocks_the_bridle(self):
         result = calculate_bridles(document(), outcome("diagnostic_only"))[0]

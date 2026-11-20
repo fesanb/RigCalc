@@ -128,6 +128,13 @@ def calculate_bridles(document, hoist_outcomes, safety_factor=1.0):
         apex_kg = high_hook_kg+bridle.weight_kg
         record["hoist_high_hook_kg"] = high_hook_kg
         record["apex_load_kg"] = apex_kg
+        # The down leg is the hoist below the apex: it carries the hoist's
+        # High Hook, not the bridle hardware.
+        record["down_leg_force_n"] = high_hook_kg*GRAVITY_M_S2
+        record["down_leg_max_force_n"] = bridle.down_leg_max_force_n
+        if (bridle.down_leg_max_force_n and
+                record["down_leg_force_n"] > bridle.down_leg_max_force_n):
+            record["down_leg_overload"] = True
         if len(bridle.legs) > 3:
             record["issues"].append("bridle_statically_indeterminate")
             continue
@@ -178,7 +185,7 @@ def calculate_bridles(document, hoist_outcomes, safety_factor=1.0):
             record["issues"].append("bridle_leg_in_compression")
         if imbalance > IMBALANCE_RATIO*load_n:
             record["issues"].append("bridle_apex_not_in_equilibrium")
-        if overloaded:
+        if overloaded or record.get("down_leg_overload"):
             record["issues"].append("bridle_leg_overload")
         record["status"] = ("calculated" if not any(
             issue in ("bridle_leg_in_compression",
@@ -200,6 +207,9 @@ def make_bridle_text(results):
                          " + bridle {:.2f} kg".format(
                              item["apex_load_kg"], item["hoist_high_hook_kg"],
                              item["weight_kg"]))
+            lines.append("  Down leg (hoist) {:.1f} N{}".format(
+                item["down_leg_force_n"],
+                " OVERLOAD" if item.get("down_leg_overload") else ""))
         for leg in item["legs"]:
             vw = leg.get("vw_force_n")
             lines.append(

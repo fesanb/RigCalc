@@ -53,6 +53,8 @@ class BridleWritebackTests(unittest.TestCase):
         legs = records["bridle"][1]
         self.assertAlmostEqual(float(legs["ForceLeg1"]), 513.7, delta=1.0)
         self.assertAlmostEqual(float(legs["ForceLeg2"]), 561.6, delta=1.0)
+        self.assertAlmostEqual(float(legs["ForceDownLeg"]), 85.91*9.80665,
+                               delta=0.01)
         point = records["R0"][1]
         self.assertAlmostEqual(float(point["ForceZ"]), -502.1, delta=1.0)
         self.assertNotIn("ForceZ", records["R2"][1])

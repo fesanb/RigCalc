@@ -307,6 +307,16 @@ def evaluate_bridles(bridles):
                     label, (item["issues"] or ["-"])[0]),
             })
             continue
+        if item.get("down_leg_overload"):
+            notifications.append({
+                "id": "bridle:{}:down".format(item["bridle_id"]),
+                "type": "bridle_leg_overload", "severity": "error",
+                "class_name": LOAD_NOTIFICATION_CLASS,
+                "construction_id": "", "source_position_mm": position,
+                "message": "OVERLOAD\nBridle {} down leg\n{:.2f}/{:.2f} kN".format(
+                    label, item["down_leg_force_n"]/1000.0,
+                    item["down_leg_max_force_n"]/1000.0),
+            })
         for leg in item["legs"]:
             if not leg.get("overload"):
                 continue

@@ -3,7 +3,8 @@
 RigCalc replaces the Braceworks/Production Assist bridle calculation, so a
 validated result is written to the same fields Vectorworks displays:
 
-* ``BridleObj``: ``ForceLeg1..n`` (N);
+* ``BridleObj``: ``ForceLeg1..n`` and ``ForceDownLeg`` (the hoist below the
+  apex), all N;
 * ``HouseRiggingPoint``: ``ForceX``, ``ForceY``, ``ForceZ`` (N, force on the
   point; Z negative = pulled down), summed over every leg anchored there.
 
@@ -69,6 +70,7 @@ def write_bridle_forces(vs, document, bridle_results):
         bridle = bridles.get(item["bridle_id"])
         values = {"ForceLeg{}".format(leg["leg"]): leg["force_n"]
                   for leg in item["legs"]}
+        values["ForceDownLeg"] = item["down_leg_force_n"]
         if (bridle is None or bridle.source_ref is None or
                 not all(isfinite(value) and value >= 0.0
                         for value in values.values())):
