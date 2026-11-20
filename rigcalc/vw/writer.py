@@ -15,6 +15,7 @@ from rigcalc.solver import (calculate_corotational_reactions,
                             make_comparison_text, select_primary_calculation)
 from rigcalc.solver.bridle import calculate_bridles, make_bridle_text
 
+from .bridle_writeback import write_bridle_forces
 from .hoist_writeback import write_high_hook_values
 from .notifications import write_notification_markers
 from .palette_session import set_active_palette_run
@@ -238,6 +239,10 @@ def write_reports(vs, document, constructions, inventory=None,
         output_dir, "rigcalc_truss_cross_writeback.json")
     with open(cross_writeback_path, "w", encoding="utf-8") as stream:
         json.dump(cross_writeback, stream, ensure_ascii=False, indent=2)
+    bridle_writeback = write_bridle_forces(vs, document, bridles)
+    with open(os.path.join(output_dir, "rigcalc_bridle_writeback.json"),
+              "w", encoding="utf-8") as stream:
+        json.dump(bridle_writeback, stream, ensure_ascii=False, indent=2)
     if progress:
         progress("update", 4, "Complete 4/4")
         progress("close")

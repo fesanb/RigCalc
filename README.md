@@ -274,7 +274,12 @@ Results, with the Vectorworks leg forces for comparison, are written to
 `rigcalc_bridles.json` and `rigcalc_bridles.txt`; leg overloads against
 `ForceMaxLeg` and bridles that cannot be calculated get a marker. Four-leg
 bridles are statically indeterminate and are reported, not calculated.
-Nothing is written to bridle objects yet.
+RigCalc replaces the Braceworks/Production Assist bridle result: for every
+calculated bridle it writes `ForceLeg1..n` (N) to the `BridleObj` and the
+summed leg forces `ForceX/Y/Z` (N) to each `HouseRiggingPoint`, under one undo
+event, verifying every value by readback (`rigcalc_bridle_writeback.json`). A
+house rigging point that also carries a leg of an uncalculated bridle is left
+untouched.
 
 ## In-document notifications
 
