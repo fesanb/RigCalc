@@ -107,6 +107,15 @@ class BridleTests(unittest.TestCase):
         self.assertIn("bridle_leg_anchors_not_found", result["issues"])
         self.assertEqual(result["legs"], [])
 
+    def test_missing_anchor_is_an_error_marker(self):
+        model = document()
+        model.house_rigging_points = []
+        result = calculate_bridles(model, outcome())[0]
+        marker = evaluate_bridles([result])[0]
+        self.assertEqual(marker["type"], "bridle_not_calculated")
+        self.assertEqual(marker["severity"], "error")
+        self.assertIn("bridle_leg_anchors_not_found", marker["message"])
+
     def test_leg_overload_is_marked(self):
         model = document()
         model.bridles[0].legs[0].max_force_n = 100.0

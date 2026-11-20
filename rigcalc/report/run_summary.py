@@ -132,6 +132,9 @@ def build_run_summary(document, constructions, primary, writeback,
                                 for item in notifications),
             "rotating_rig_hoists": sum(item.get("type") == "rig_rotation"
                                        for item in notifications),
+            "bridles_not_calculated": sum(
+                item.get("type") == "bridle_not_calculated"
+                for item in notifications),
         },
         "uncalculated_constructions": {
             "count": len(uncalculated_ids),
@@ -164,7 +167,8 @@ def make_run_summary_text(summary):
         unhandled["count"] or notifications.get("load_errors", 0) or
         notifications.get("internal_errors", 0) or
         notifications.get("slack_chains", 0) or
-        notifications.get("rotating_rig_hoists", 0)) else "COMPLETE"
+        notifications.get("rotating_rig_hoists", 0) or
+        notifications.get("bridles_not_calculated", 0)) else "COMPLETE"
     return (
         "RIGCALC  /  RUN SUMMARY\n"
         "Status: {}\n\n"
@@ -191,6 +195,7 @@ def make_run_summary_text(summary):
         "Internal-force errors: {}\n"
         "Slack chains (High Hook 0.00): {}\n"
         "Hoists on rotating rigs: {}\n"
+        "Bridles not calculated (error): {}\n"
         "Technical errors: {}\n"
         "Writeback-blocking reasons: {}\n"
         "Uncalculated constructions: {}\n"
@@ -217,7 +222,8 @@ def make_run_summary_text(summary):
         notifications.get("deflections", 0),
         notifications.get("internal_errors", 0),
         notifications.get("slack_chains", 0),
-        notifications.get("rotating_rig_hoists", 0), errors["count"],
+        notifications.get("rotating_rig_hoists", 0),
+        notifications.get("bridles_not_calculated", 0), errors["count"],
         len(blocking_issues),
         uncalculated.get("count", 0),
         unhandled["count"], unhandled["hoists"],
