@@ -9,7 +9,7 @@ eligible.
 | Geometry or topology | Current result | Required implementation path | Tracking |
 | --- | --- | --- | --- |
 | Level, collinear, open chain | Linear signed beam diagnostic with exhaustive bounded fixed-point contact-state search. | Implement physical unilateral contact: slack, re-engagement, contact mass and scalable active-set solve. | #7 |
-| Straight inclined planar open chain | Fixed-global-gravity frame diagnostic; signed reactions, active-set diagnostics and numerical evidence are reported. | Nonlinear planar contact equilibrium with the same physical cable model. | #7 |
+| Straight inclined planar open chain | Fixed-global-gravity frame diagnostic; signed reactions, active-set diagnostics and numerical evidence are reported. When every hoist has an observed motor point, a corotational tension-only cable model reports slack/taut state, slack gap, re-engagement with contact mass at taut pickups only, and deformed-configuration equilibrium (diagnostic, writeback-blocked). | Promote a validated cable result to the primary calculation; independent reference and Vectorworks validation (#8). | #7 |
 | Vertical truss chain | Explicit `unsupported_vertical_truss_geometry` diagnostic. | Axial/gravity load-path model and support semantics. | #6 |
 | Curved or inverted chain | Explicit diagnostic through topology/geometry validation. | Curved-beam or segmented geometric-nonlinear model. | #6 |
 | Branched construction | Explicit `requires_branched_or_loop_solver` diagnostic. | Graph/frame assembly with branch support conditions. | #6 |

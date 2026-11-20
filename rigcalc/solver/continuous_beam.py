@@ -12,7 +12,8 @@ This remains a first-order vertical model, not the later geometric model.
 from itertools import combinations
 
 from .beam_statics import _reaction_record, planar_beam_geometry_issue
-from .contact import contact_mass_by_support, engaged_contact_mass_loads
+from .contact import (RELEASED_CONTACT_RULE, contact_mass_by_support,
+                      engaged_contact_mass_loads, released_contact_is_slack)
 from .deflection import (build_deflection_summary,
                          support_span_midpoints)
 from .frame3d import FrameElement, FrameModel, FrameNode, solve_frame
@@ -68,8 +69,9 @@ def _section_result(section):
 def _resolve_tension_only_active_set(construction, loads, signed_reactions):
     """Find the complementarity-valid hoist set for a small support system.
 
-    A released cable must have non-positive vertical displacement (slack/down),
-    while every active cable must have a non-negative reaction.  Enumerating
+    A released chain must have a non-negative vertical displacement (the
+    pickup rises toward the motor, so the chain is slack), while every active
+    chain must have a non-negative reaction.  Enumerating
     the candidate sets avoids the unsafe assumption that a released support
     can never become active again after load redistribution.
     """
@@ -108,8 +110,8 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
                 round(item["station_mm"], 6): item["displacements"]["uz_m"]
                 for item in candidate["stations"]}
             released_valid = all(
-                displacements.get(round(item.attachment.global_station_mm, 6),
-                                  float("inf")) <= 1.0e-8
+                released_contact_is_slack(displacements.get(
+                    round(item.attachment.global_station_mm, 6)))
                 for item in hoists if item not in active_hoists)
             if active_valid and released_valid:
                 candidates.append((len(active_hoists), candidate))
@@ -122,7 +124,7 @@ def _resolve_tension_only_active_set(construction, loads, signed_reactions):
         "method": "exhaustive_tension_only_active_set",
         "candidate_sets_evaluated": evaluated,
         "candidate_sets_valid": len(candidates),
-        "released_support_displacement_rule": "uz_m <= 1e-8",
+        "released_support_displacement_rule": RELEASED_CONTACT_RULE,
     }
     return "resolved", result
 

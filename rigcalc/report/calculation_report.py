@@ -45,6 +45,16 @@ def make_calculation_text(data):
                     "yes" if validation.get("support_model_valid") else "no",
                     "yes" if validation.get("numerically_valid") else "no",
                     "yes" if validation.get("load_model_valid") else "no"))
+        contact_state = item.get("contact_state_validation")
+        if contact_state:
+            lines.append(
+                "Contact state: method={} consistent={} iterations={} "
+                "slack chains={}".format(
+                    contact_state.get("method", "-"),
+                    "yes" if contact_state.get("consistent") else "no",
+                    len(contact_state.get("iterations", [])),
+                    ", ".join(contact_state.get("released_support_ids", []))
+                    or "none"))
         numerical = item.get("numerical_diagnostics", {})
         if numerical:
             lines.append(
@@ -58,6 +68,9 @@ def make_calculation_text(data):
             support_state = (
                 " [released tension-only support]"
                 if reaction.get("support_active") is False else "")
+            if reaction.get("cable_state") == "slack":
+                support_state = " [chain slack {:.1f} mm]".format(
+                    reaction.get("cable_slack_mm", 0.0))
             support_label = reaction.get("support_hoist_id") or reaction["support_id"]
             if support_label != reaction["support_id"]:
                 support_label += " [{}]".format(reaction["support_id"])

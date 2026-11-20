@@ -105,6 +105,8 @@ def _cable_state(cable, node_i, node_j, displacement):
                          tension*c, tension*s, 0.0),
         "length_m": length, "extension_m": extension,
         "tension_n": tension, "active": extension >= 0.0,
+        # Unit vector from node_i to node_j in the deformed configuration.
+        "direction_x": c, "direction_z": s,
     }
 
 
@@ -214,7 +216,11 @@ def solve_corotational(model, initial_load_step=0.1, minimum_load_step=0.0025,
             step_iterations += 1
             internal = _internal_force(model, displacement, order)
             residual = [target[index]-internal[index] for index in free]
-            reference = max([abs(target[index]) for index in free] + [1.0])
+            # Measure equilibrium relative to the complete applied load, not
+            # the current load increment.  A small first increment on a stiff
+            # truss otherwise demands a residual below the floating-point
+            # noise of its axial forces and the step can never converge.
+            reference = max([abs(value) for value in external] + [1.0])
             residual_norm = max([abs(value) for value in residual] + [0.0])
             if progress:
                 progress({"load_factor": trial_factor,

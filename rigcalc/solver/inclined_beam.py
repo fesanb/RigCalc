@@ -6,7 +6,8 @@ from .continuous_beam import (GRAVITY_M_S2, MAX_EXHAUSTIVE_TENSION_ONLY_HOISTS,
 from .frame3d import (FrameElement, FrameModel, FrameNode, element_axes,
                       global_uniform_load_to_local, solve_frame)
 from .inclined_geometry import inclined_station_coordinates, planar_coordinate
-from .contact import contact_mass_by_support, engaged_contact_mass_loads
+from .contact import (RELEASED_CONTACT_RULE, contact_mass_by_support,
+                      engaged_contact_mass_loads, released_contact_is_slack)
 from math import sqrt
 from itertools import combinations
 from .deflection import build_deflection_summary, support_span_midpoints
@@ -97,7 +98,8 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
                     candidate = solve_inclined_planar_frame(construction, candidate_loads, ids, _signed_reactions)
                     if candidate["status"] != "diagnostic" or any(r["reaction_mass_kg"] < -1e-6 for r in candidate["reactions"]): continue
                     displacement = {round(item["station_mm"], 6): item["displacements"]["uz_m"] for item in candidate["stations"]}
-                    if any(displacement[round(item.attachment.global_station_mm, 6)] > 1e-8 for item in hoists if item.item.id not in ids): continue
+                    if not all(released_contact_is_slack(displacement.get(round(item.attachment.global_station_mm, 6)))
+                               for item in hoists if item.item.id not in ids): continue
                     valid.append(candidate)
             if valid:
                 result = max(valid, key=lambda item: len(item["reactions"]))
@@ -109,7 +111,8 @@ def solve_inclined_planar_frame(construction, loads, _active_ids=None,
                     reaction["support_active"] = support.item.id in active
                     reaction["unconstrained_reaction_mass_kg"] = signed.get(support.item.id, {}).get("reaction_mass_kg")
                     result["reactions"].append(reaction)
-                result["active_set_validation"] = {"method":"exhaustive_inclined_tension_only_active_set", "candidate_sets_valid":len(valid)}
+                result["active_set_validation"] = {"method":"exhaustive_inclined_tension_only_active_set", "candidate_sets_valid":len(valid),
+                                                   "released_support_displacement_rule": RELEASED_CONTACT_RULE}
                 return result
             # A negative reaction is a cable-slack condition, not an allowable
             # hoist load.  Do not present the unconstrained linear result as a
