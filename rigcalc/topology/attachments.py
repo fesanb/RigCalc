@@ -4,6 +4,7 @@ from math import radians, sin
 from rigcalc import config
 from rigcalc.model.construction import AttachedObject, Attachment
 from rigcalc.model.hoist import Support
+from rigcalc.model.load import PointLoad
 
 from .geometry import point_to_segment, point_to_segment_2d
 
@@ -51,6 +52,16 @@ def nearest_line_truss(position, trusses, plan_only=False):
     return best
 
 
+def _plan_rise_ratio(truss):
+    """Horizontal share of a member's length (0 for a vertical member)."""
+    points = truss.axis_points(1.0)
+    if len(points) < 2:
+        return 0.0
+    plan = sum(((b.x-a.x)**2+(b.y-a.y)**2)**0.5
+               for a, b in zip(points, points[1:]))
+    return plan/truss.axis_length_mm if truss.axis_length_mm else 0.0
+
+
 def attach_item(item, construction, plan_only=False, method="geometry_sphere"):
     nearest = nearest_line_truss(
         item.position, construction.truss_segments, plan_only=plan_only)
@@ -59,6 +70,16 @@ def attach_item(item, construction, plan_only=False, method="geometry_sphere"):
     clearance, axis_distance, _, truss, local_t, qx, qy, qz = nearest
     if clearance > config.ATTACHMENT_SEARCH_RADIUS_MM:
         return None
+    if (isinstance(item, (Support, PointLoad)) and not plan_only and
+            _plan_rise_ratio(truss) >= 0.1):
+        # A hoist chain and a hung load act vertically: the pickup is the
+        # point on the carrier directly above/below the object in plan.  The
+        # nearest point in 3D slides along an inclined member whenever the
+        # object is not exactly on the axis (a load hung 440 mm below a 30
+        # degree truss moved 190 mm).  Association still uses 3D clearance.
+        vertical = _nearest_on_axis(item.position, truss, True)
+        if vertical is not None:
+            _, local_t, qx, qy, qz = vertical
     local = local_t * truss.axis_length_mm
     station = None
     station_range = construction.station_map.get(truss.id)

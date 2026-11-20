@@ -123,17 +123,18 @@ def _parse_support(vs, handle, object_id, fields, safety_factor=1.0):
         return None
     # Use the lower rigging connection, not the hoist geometry centre.
     # Spotlight stores X/Y in Origin and the lower carrier trim separately.
-    # A trim of 0 mm is a real elevation (for example a truss on the floor),
-    # so only a missing or unparseable field falls back to another source.
-    lower_source = "TrussBottomTrim"
-    lower_trim = safe_float(fields.get("TrussBottomTrim"))
-    # An inverted hoist's lower connection is its load trim.  Empty/zero
-    # TrussBottomTrim is common when it is attached to a Lighting Pipe rather
-    # than a Spotlight Truss System.
-    if fields.get("HoistPos", "").strip().lower() == "hoist up":
-        load_trim = safe_float(fields.get("LoadTrim"))
-        if load_trim is not None:
-            lower_source, lower_trim = "LoadTrim", load_trim
+    # LoadTrim (= LoHook) is the hook height at the load for both hoist
+    # orientations and follows the hoist when it is moved.  TrussBottomTrim
+    # is only maintained while the hoist is linked to a truss system: on an
+    # unlinked hoist it keeps a stale value (in the test drawing 0 mm after
+    # the rig was raised by 8 m).  A trim of 0 mm is still a real elevation,
+    # so only a missing or unparseable field falls back to the next source.
+    lower_source, lower_trim = None, None
+    for name in ("LoadTrim", "LoHook", "TrussBottomTrim"):
+        value = safe_float(fields.get(name))
+        if value is not None:
+            lower_source, lower_trim = name, value
+            break
     if lower_trim is None:
         lower_source, lower_trim = "geometry_centre_fallback", center_z(
             vs, handle)

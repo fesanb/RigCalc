@@ -29,12 +29,30 @@ class ScannerDeduplicationTests(unittest.TestCase):
         })
         self.assertAlmostEqual(support.position.z, 5542.0)
 
-    def test_zero_bottom_trim_is_a_real_elevation_not_missing(self):
-        # A truss on the floor has TrussBottomTrim 0; the motor centre is
-        # metres above it.  Falling back to the centre detached every hoist.
+    def test_hoist_down_uses_load_trim_not_stale_bottom_trim(self):
+        # An unlinked hoist keeps a stale TrussBottomTrim (0) after the rig
+        # is raised; LoadTrim follows the hoist (test drawing regression).
         support = _parse_support(FakeVS(), "handle", "H1", {
             "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
-            "LoadTrim": "143,5", "TrussBottomTrim": "0e00",
+            "LoadTrim": "8,454993582983418e03", "LoHook": "8454,99",
+            "TrussBottomTrim": "0e00",
+        })
+        self.assertAlmostEqual(support.position.z, 8454.993582983418)
+        self.assertEqual(
+            support.geometry_fields["RigCalcLowerConnectionSource"],
+            "LoadTrim")
+
+    def test_zero_trim_is_a_real_elevation_not_missing(self):
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
+            "LoadTrim": "0e00",
+        })
+        self.assertAlmostEqual(support.position.z, 0.0)
+
+    def test_bottom_trim_is_used_when_load_trim_is_missing(self):
+        support = _parse_support(FakeVS(), "handle", "H1", {
+            "HoistPos": "Hoist Down", "OriginX": "100", "OriginY": "200",
+            "TrussBottomTrim": "0",
         })
         self.assertAlmostEqual(support.position.z, 0.0)
         self.assertEqual(

@@ -233,6 +233,26 @@ class GeometryBenchmarkTests(unittest.TestCase):
                       result["issues"])
 
 
+class VerticalPickupTests(unittest.TestCase):
+    def test_hung_load_and_hoist_attach_directly_below_in_plan(self):
+        # 30 degree truss; the load hangs 440 mm below the axis.  The nearest
+        # 3D point would slide ~220 mm down the slope (B3 regression).
+        rise = 6000.0*3.0**-0.5
+        truss = line("I", (0, 0, 0), (6000, 0, rise), 0)
+        middle_z = rise/2.0
+        construction, result, _ = solve(
+            [truss], [hoist("H1", (500, 0, 500*rise/6000-300)),
+                      hoist("H2", (5500, 0, 5500*rise/6000-300))],
+            [load("P", (3000, 0, middle_z-440), 200)])
+        attached = construction.point_loads[0].attachment
+        self.assertAlmostEqual(attached.projected_x, 3000.0, delta=0.5)
+        hoists = {item.item.id: item.attachment for item in
+                  construction.supports}
+        self.assertAlmostEqual(hoists["H1"].projected_x, 500.0, delta=0.5)
+        for value in reactions(result).values():
+            self.assertAlmostEqual(value, 100.0, delta=0.01)
+
+
 class TransferredLoadTests(unittest.TestCase):
     frame = staticmethod(lambda: [
         line("S1", (0, 0, 0), (6000, 0, 0), 0),
